@@ -1,0 +1,5 @@
+geometry_msgs/Point currentPos
+geometry_msgs/Point targetPos
+---
+bool pathChanged
+geometry_msgs/Point newPos

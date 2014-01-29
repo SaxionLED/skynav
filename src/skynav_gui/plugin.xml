@@ -1,0 +1,12 @@
+<library path="src">
+  <class name="skyNavGUI" type="skynav_gui_main.skyNavGUI" base_class_type="rqt_gui_py::Plugin">
+    <description>
+		User interface for the skynav indoor robot navigation module.
+    </description>
+    <qtgui>
+       <label>skynav User Interface</label>
+      <icon type="theme">system-help</icon>
+      <statustip>User interface for the skynav indoor navigation module for a robot.</statustip>
+    </qtgui>
+  </class>
+</library>

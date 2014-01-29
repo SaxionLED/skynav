@@ -1,0 +1,8 @@
+#request
+uint8 request
+string file_path
+---
+#response
+bool response
+nav_msgs/OccupancyGrid map
+

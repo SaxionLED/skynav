@@ -1,0 +1,6 @@
+#request
+uint8 request			#request value
+geometry_msgs/Pose2D[] waypoints		#list of fixed waypoints
+---
+#response
+uint8 response		#return value

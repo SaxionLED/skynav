@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>skynav_gui</class>
+ <widget class="QWidget" name="skynav_gui">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>849</width>
+    <height>624</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Skynav gui</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout_2">
+   <item row="0" column="0">
+    <widget class="QTabWidget" name="module_tab_widget">
+     <property name="tabPosition">
+      <enum>QTabWidget::South</enum>
+     </property>
+     <property name="currentIndex">
+      <number>0</number>
+     </property>
+     <widget class="QWidget" name="GlobalNav_tab">
+      <attribute name="title">
+       <string>GlobalNav</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_3">
+       <item row="0" column="0">
+        <layout class="QGridLayout" name="Globalnav_layout"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="LocalNav_tab">
+      <attribute name="title">
+       <string>LocalNav</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_5">
+       <item row="0" column="0">
+        <layout class="QGridLayout" name="Localnav_layout"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="SkyNav_tab">
+      <attribute name="title">
+       <string>Skynav</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_7">
+       <item row="0" column="0">
+        <layout class="QGridLayout" name="Skynav_layout"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="Information_tab">
+      <attribute name="title">
+       <string>About</string>
+      </attribute>
+      <layout class="QGridLayout" name="gridLayout_9">
+       <item row="0" column="0">
+        <layout class="QGridLayout" name="about_layout">
+         <item row="0" column="0">
+          <widget class="QTextEdit" name="textEdit">
+           <property name="documentTitle">
+            <string>about</string>
+           </property>
+           <property name="readOnly">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </widget>
+   </item>
+  </layout>
+ </widget>
+ <layoutdefault spacing="6" margin="11"/>
+ <resources/>
+ <connections/>
+</ui>

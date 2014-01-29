@@ -1,0 +1,8 @@
+#request
+uint32 	nrNodes
+uint32 	nrConnect
+float64 mxDist
+---
+#response
+
+bool response
