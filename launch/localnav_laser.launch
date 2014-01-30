@@ -17,8 +17,8 @@
 		<node pkg="skynav_control" name="waypoint_filter" type="waypoint_filter" output="screen"/>
 	</group>
 	
-	<group ns="SLAM">
-		<node pkg="skynav_SLAM" name="pose_estimation" type="pose_estimation" output="screen"/>
+	<group ns="slam">
+		<node pkg="skynav_slam" name="pose_estimation" type="pose_estimation" output="screen"/>
 	</group>
 	
 	<group ns="localnav">
