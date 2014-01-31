@@ -3,12 +3,12 @@
       <param name="robot_description" command="$(find xacro)/xacro.py '$(find x80sv_description)/urdf/x80sv.xacro'" />
 
 	<group ns="robot">
-		<rosparam file="$(find skynav_driver)/x80_config.yaml" command="load"/>
-		<node pkg="skynav_driver" name="x80_robot" type="x80_robot" output="screen"/>	
-		<!-- <node pkg="skynav_driver" name="input_keyboard" type="input_keyboard" output="screen"/> -->
-		<!-- <node pkg="skynav_driver" name="neato_laser_publisher" type="neato_laser_publisher" output="screen"/> -->
-		<node pkg="skynav_driver" name="robot_wrapper" type="robot_wrapper" output="screen"/>
-		<node pkg="skynav_driver" name="sensor_safety" type="sensor_safety" output="screen"/>
+		<rosparam file="$(find x80sv_driver)/x80_config.yaml" command="load"/>
+		<node pkg="x80sv_driver" name="x80_robot" type="x80_robot" output="screen"/>	
+		<!-- <node pkg="x80sv_driver" name="input_keyboard" type="input_keyboard" output="screen"/> -->
+		<!-- <node pkg="x80sv_driver" name="neato_laser_publisher" type="neato_laser_publisher" output="screen"/> -->
+		<node pkg="x80sv_driver" name="robot_wrapper" type="robot_wrapper" output="screen"/>
+		<node pkg="x80sv_driver" name="sensor_safety" type="sensor_safety" output="screen"/>
 	</group>
 	
 	<group ns="control">
