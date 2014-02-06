@@ -1,0 +1,20 @@
+<launch>
+
+      <param name="robot_description" command="$(find xacro)/xacro.py '$(find x80sv_description)/urdf/x80sv.xacro'" />
+	
+	<group ns="control">
+		<node pkg="skynav_control" name="motion_control" type="motion_control" output="screen"/>
+		<node pkg="skynav_control" name="data_verifier" type="data_verifier" output="screen"/>
+		<node pkg="skynav_control" name="waypoint_filter" type="waypoint_filter" output="screen"/>
+	</group>
+	
+	<group ns="slam">
+		<node pkg="skynav_slam" name="pose_estimation" type="pose_estimation" output="screen"/>
+	</group>
+	
+	<group ns="localnav">
+		<node pkg="skynav_localnav" name="obstacle_detector" type="obstacle_detector" output="screen"/>
+		<node pkg="skynav_localnav" name="local_planner" type="local_planner" output="screen"/>
+	</group>
+
+</launch>

@@ -1,6 +1,5 @@
 #include <ros/ros.h>
 #include <skynav_msgs/current_pose.h>
-#include <skynav_msgs/TimedPose.h>
 #include <string.h>
 #include <list>
 #include <boost/algorithm/string.hpp>
@@ -9,11 +8,13 @@
 #include <geometry_msgs/Quaternion.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Twist.h>
 
 // defines
-#define SPEED_MULTIPLIER                10                      // 1 / multiplier = speed
-#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 5          // radss
-#define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
+#define MOTION_VELOCITY                	1.0                      // speed in m/s
+#define TURN_VELOCITY					1.0						// turn speed in rad/s
+#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 0          // rads
+#define DISTANCE_ERROR_ALLOWED          0.0                    // in meters
 
 #define ROBOT_WAYPOINT_ACCURACY         true                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
 
@@ -36,13 +37,12 @@ ros::NodeHandle* mNode;
 ros::NodeHandle* mNodeSLAM;
 
 ros::ServiceClient servClientCurrentPose;
-ros::Publisher pubTargetMotion, pubNavigationState, pubTargetPoseStamped;
+ros::Publisher pubCmdVel, pubNavigationState, pubTargetPoseStamped;
 
 list<PoseStamped>* mCurrentPath = new list<PoseStamped>;
 double mEndOrientation = 0;
 
-ros::Timer mTargetPoseTimeout;
-ros::Timer mTargetOrientationTimeout;
+ros::Timer mCmdVelTimeout;
 uint8_t mNavigationState = NAV_READY; // initial state
 
 void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
@@ -80,16 +80,15 @@ void clearPath() {
     mCurrentPath->clear(); // clear the path
 }
 
-void targetPoseTimeoutCallback(const ros::TimerEvent&) {
+void cmdVelTimeoutCallback(const ros::TimerEvent&) {
 
-    mTargetPoseTimeout.stop();
-    pubNavigationStateHelper(NAV_POSE_REACHED);
-}
-
-void targetOrientationTimeoutCallback(const ros::TimerEvent&) {
-
-    mTargetOrientationTimeout.stop();
+    mCmdVelTimeout.stop();
     pubNavigationStateHelper(NAV_READY); //TODO naming is poor here
+    
+    Twist twist;	// empty twist, stops the robot
+    pubCmdVel.publish(twist);
+    
+    ROS_INFO("stopped timer");
 }
 
 Pose getCurrentPose() {
@@ -130,43 +129,54 @@ double calcShortestTurn(double a1, double a2) {
     return dif;
 }
 
-bool motionTurn(geometry_msgs::Quaternion q) {
+void publishCmdVel(Twist twist, double t)	{
+	
+	//publish to cmd_vel
+	pubCmdVel.publish(twist);
 
-    if (q.z > ANGLE_ERROR_ALLOWED || q.z < -ANGLE_ERROR_ALLOWED) {// this allows a theta error
+	// this timer is to timeout the target location
+	mCmdVelTimeout = mNode->createTimer(ros::Duration(t), cmdVelTimeoutCallback); //TODO timer value
+}
 
-        skynav_msgs::TimedPose relativeTargetPose;
 
-        relativeTargetPose.pose.orientation = q;
-        relativeTargetPose.actuationSeconds = fmax(abs(q.z) * 3, 2); // time to turn // TODO time value variable
+bool motionTurn(Quaternion target) {
 
-        pubTargetMotion.publish(relativeTargetPose);
+    if (target.z > ANGLE_ERROR_ALLOWED || target.z < -ANGLE_ERROR_ALLOWED) {// this allows a theta error
 
-        // this timer is to timeout orientation towards target location
-        mTargetOrientationTimeout = mNode->createTimer(ros::Duration(relativeTargetPose.actuationSeconds + 2), targetOrientationTimeoutCallback); //TODO timer value
+		double t;	// time until stop signal
+		
+		Twist twist;
+		twist.angular.z = TURN_VELOCITY;
+		
+		t = target.z / TURN_VELOCITY;
+		
+		publishCmdVel(twist, t);
 
         return true;
     } else
         return false;
 }
 
-bool motionForward(geometry_msgs::Point p) {
+bool motionForward(Point target) {
 
-    if (p.x > DISTANCE_ERROR_ALLOWED) {
+    if (target.x > DISTANCE_ERROR_ALLOWED) {
+		
+		double t;	// time until stop signal
+		
+		Twist twist;
+		twist.linear.x = MOTION_VELOCITY;
+		
+		t = target.x / MOTION_VELOCITY;
+		
+		ROS_INFO("started timer");
 
-        skynav_msgs::TimedPose relativeTargetPose;
-
-        relativeTargetPose.pose.position = p;
-        relativeTargetPose.actuationSeconds = fmax(abs(relativeTargetPose.pose.position.x) * SPEED_MULTIPLIER, 2); // time to move straight ahead //TODO time
-
-        pubTargetMotion.publish(relativeTargetPose);
-
-        // this timer is to timeout the target location
-        mTargetPoseTimeout = mNode->createTimer(ros::Duration(relativeTargetPose.actuationSeconds + 2), targetPoseTimeoutCallback); //TODO timer value
+		publishCmdVel(twist, t);
 
         return true;
     } else
         return false;
 }
+
 
 void navigate() {
 
@@ -226,7 +236,7 @@ void navigate() {
             pubTargetPoseStamped.publish(absoluteTargetPose);
 
             Pose currentPose = getCurrentPose();
-            skynav_msgs::TimedPose relativeTargetPose;
+            Pose relativeTargetPose;
 
             if (posesEqual(currentPose, absoluteTargetPose.pose)) {
                 ROS_INFO("already at targetPose, skipping");
@@ -239,24 +249,24 @@ void navigate() {
             double a1 = atan2(absoluteTargetPose.pose.position.y - currentPose.position.y, absoluteTargetPose.pose.position.x - currentPose.position.x); // calc turn towards next point
             double a2 = currentPose.orientation.z;
 
-            relativeTargetPose.pose.orientation.z = calcShortestTurn(a1, a2); // determine shortest turn (CW or CCW)
+            relativeTargetPose.orientation.z = calcShortestTurn(a1, a2); // determine shortest turn (CW or CCW)
 
 
 
 
-            if (!motionTurn(relativeTargetPose.pose.orientation)) { //if false, angle falls within the allowed error value, so now we move forward
+            if (!motionTurn(relativeTargetPose.orientation)) { //if false, angle falls within the allowed error value, so now we move forward
 
-                ROS_INFO("skipping turn of %f degrees", relativeTargetPose.pose.orientation.z * 180 / M_PI);
+                ROS_INFO("skipping turn of %f degrees", relativeTargetPose.orientation.z * 180 / M_PI);
 
-                relativeTargetPose.pose.orientation.z = 0; // theta no longer used
+                relativeTargetPose.orientation.z = 0; // theta no longer used
 
-                relativeTargetPose.pose.position.x = sqrt(pow(absoluteTargetPose.pose.position.x - currentPose.position.x, 2) + pow(absoluteTargetPose.pose.position.y - currentPose.position.y, 2));
+                relativeTargetPose.position.x = sqrt(pow(absoluteTargetPose.pose.position.x - currentPose.position.x, 2) + pow(absoluteTargetPose.pose.position.y - currentPose.position.y, 2));
 
 
 
-                if (!motionForward(relativeTargetPose.pose.position)) { // if false, distance falls within the allowed error value, so we have reached the pose
+                if (!motionForward(relativeTargetPose.position)) { // if false, distance falls within the allowed error value, so we have reached the pose
 
-                    ROS_INFO("skipping distance of %fm", relativeTargetPose.pose.position.x);
+                    ROS_INFO("skipping distance of %fm", relativeTargetPose.position.x);
                     pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
                     return; // skip the timer and nav state
                 }
@@ -298,28 +308,27 @@ void placeholder_ManualTargetPose() {
     //        vector<string> stringInput;
     //        boost::split(stringInput, userInput, boost::is_any_of(","));
 
-    skynav_msgs::TimedPose targetPose;
-    targetPose.pose.position.x = atof(userInput.c_str());
-    //        targetPose.pose.theta = atof(userInput.c_str());
-    targetPose.actuationSeconds = targetPose.pose.position.x * 10;
+    Pose pose;
+    pose.position.x = atof(userInput.c_str());
+	motionForward(pose.position);
+    
 
     //        ROS_INFO("please input target theta (degrees)");
     //        cin >> userInput;
     //targetPose.pose.theta = 0;//M_PI / 180 * atof(userInput.c_str());
-
-    pubTargetMotion.publish(targetPose);
 }
 
 int main(int argc, char **argv) {
 
     ros::init(argc, argv, "motion_control");
 
+	ros::NodeHandle n = ros::NodeHandle("");
     mNode = new ros::NodeHandle("/control");
     mNodeSLAM = new ros::NodeHandle("/SLAM");
 
 
     //pubs
-    pubTargetMotion = mNode->advertise<skynav_msgs::TimedPose>("target_motion", 32);
+    pubCmdVel = n.advertise<Twist>("/cmd_vel", 2);
     pubNavigationState = mNode->advertise<std_msgs::UInt8>("navigation_state", 0);
     pubTargetPoseStamped = mNode->advertise<geometry_msgs::PoseStamped>("target_pose", 4);
 
@@ -337,13 +346,13 @@ int main(int argc, char **argv) {
     loop_rate.sleep();
     loop_rate.sleep();
 
-    //    placeholder_ManualTargetPose();
+    placeholder_ManualTargetPose();
 
     while (ros::ok()) {
 
         ros::spinOnce(); // read topics
 
-        navigate();
+       // navigate();
 
         loop_rate.sleep(); // sleep
     }

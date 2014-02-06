@@ -100,13 +100,9 @@ int main(int argc, char **argv) {
     //service
     ros::ServiceClient servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
 
-    ROS_INFO("starting waypoint_filter in 2s");
     ros::Rate loop_rate(0.5);
 
-    loop_rate.sleep(); // sleep 2 sec
-    loop_rate.sleep(); // sleep 2 sec
-    loop_rate.sleep(); // sleep 2 sec
-
+// add a sleep here
 //    placeholderGlobalPlannerWaypoints();
 
     //add waypoint service to globalnav here
