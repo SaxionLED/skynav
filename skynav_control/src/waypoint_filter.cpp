@@ -103,7 +103,8 @@ int main(int argc, char **argv) {
     ros::Rate loop_rate(0.5);
 
 // add a sleep here
-//    placeholderGlobalPlannerWaypoints();
+	loop_rate.sleep();
+    placeholderGlobalPlannerWaypoints();
 
     //add waypoint service to globalnav here
 

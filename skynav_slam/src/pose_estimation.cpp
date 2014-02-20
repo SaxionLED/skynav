@@ -2,6 +2,7 @@
 #include <geometry_msgs/Pose.h>
 #include <skynav_msgs/current_pose.h>
 #include <tf/transform_broadcaster.h>
+#include <tf/transform_listener.h>
 #include <nav_msgs/Path.h>
 #include <std_msgs/Header.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -17,9 +18,41 @@ ros::Publisher pubTraversedPath;
 Pose mCurrentPose;
 nav_msgs::Path mTraversedPath;
 
+tf::TransformListener* mTransformListener;
+
+void publishCurrentPoseTF() {
+
+    
+    // tf current pose
+    static tf::TransformBroadcaster br;
+    tf::Transform transform;
+    transform.setOrigin(tf::Vector3(mCurrentPose.position.x, mCurrentPose.position.y, mCurrentPose.position.z));      // derp ROS... must convert Point to Vector3 manually, even though they are *exactly* the same
+    transform.setRotation(tf::Quaternion(mCurrentPose.orientation.x, mCurrentPose.orientation.y, mCurrentPose.orientation.z)); // same as above... geometry_msgs::Quaternion and tf::Quaternion... derp
+    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/map", "/base_link"));
+}
+
+
+
 bool servServerCurrentPoseCallback(skynav_msgs::current_pose::Request &request, skynav_msgs::current_pose::Response &response) {
 
-    response.pose = mCurrentPose;
+    //response.pose = mCurrentPose;
+    
+    // using TF to get current pose relative to /map (global frame)
+
+    tf::StampedTransform st;
+    
+    try {
+		mTransformListener->lookupTransform("/map", "/base_link", ros::Time(0), st);
+	}	catch (tf::TransformException ex)	{
+		ROS_ERROR("%s", ex.what());
+		return false;
+	}
+	
+    response.pose.position.x = st.getOrigin().x();
+    response.pose.position.y = st.getOrigin().y();
+    response.pose.orientation.z = tf::getYaw(st.getRotation());
+    
+    //ROS_INFO("current tf pose: %f, %f, %f", response.pose.position.x, response.pose.position.y, response.pose.orientation.z * (180 / M_PI));    
 
     return true;
 }
@@ -54,6 +87,8 @@ void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg) {
             ps.pose = mCurrentPose;
             
             mTraversedPath.poses.push_back(ps);
+            
+            publishCurrentPoseTF();
 
             ROS_INFO("pose updated! x: %f, y: %f, theta: %.2f degrees", mCurrentPose.position.x, mCurrentPose.position.y, (mCurrentPose.orientation.z * 180 / M_PI));
 
@@ -64,16 +99,6 @@ void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg) {
 
 }
 
-void publishCurrentPoseTF() {
-
-    
-    // tf current pose
-    static tf::TransformBroadcaster br;
-    tf::Transform transform;
-    transform.setOrigin(tf::Vector3(mCurrentPose.position.x, mCurrentPose.position.y, mCurrentPose.position.z));      // derp ROS... must convert Point to Vector3 manually, even though they are *exactly* the same
-    transform.setRotation(tf::Quaternion(mCurrentPose.orientation.x, mCurrentPose.orientation.y, mCurrentPose.orientation.z)); // same as above... geometry_msgs::Quaternion and tf::Quaternion... derp
-    br.sendTransform(tf::StampedTransform(transform, ros::Time::now(), "/map", "/base_link"));
-}
 
 void publishTraversedPath()     {
     
@@ -91,6 +116,8 @@ int main(int argc, char **argv) {
     // init
     mTraversedPath.header.frame_id = "/map";
     mTraversedPath.header.stamp = ros::Time::now();
+    mTransformListener = new tf::TransformListener();
+    
     
     // pubs
     pubTraversedPath = n.advertise<nav_msgs::Path>("traversed_path", 32);
@@ -102,17 +129,18 @@ int main(int argc, char **argv) {
     servServerCurrentPose = n.advertiseService("current_pose", servServerCurrentPoseCallback);
 
     ros::Rate loop_rate(10);    //10hz
-
+    
     while (ros::ok()) {
 
         ros::spinOnce();
         
-        publishCurrentPoseTF();
         publishTraversedPath();
 
         loop_rate.sleep();
 
     }
+    
+    delete mTransformListener;
 
     return 0;
 }

@@ -11,12 +11,12 @@
 #include <geometry_msgs/Twist.h>
 
 // defines
-#define MOTION_VELOCITY                	1.0                      // speed in m/s
-#define TURN_VELOCITY					1.0						// turn speed in rad/s
-#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 0          // rads
-#define DISTANCE_ERROR_ALLOWED          0.0                    // in meters
+#define MOTION_VELOCITY                	0.2                      // speed in m/s
+#define TURN_VELOCITY					0.5						// turn speed in rad/s
+#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 1          // rads
+#define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
-#define ROBOT_WAYPOINT_ACCURACY         true                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
+#define ROBOT_WAYPOINT_ACCURACY         false                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
 
 enum NAVIGATION_STATE { //TODO move this into a shared container (skynav_msgs perhaps?)
     NAV_READY = 0,
@@ -73,6 +73,7 @@ void pubNavigationStateHelper(NAVIGATION_STATE state) {
     std_msgs::UInt8 pubmsg;
     pubmsg.data = state;
     pubNavigationState.publish(pubmsg);
+    ROS_INFO("nav state changed to %u", state);
 }
 
 void clearPath() {
@@ -104,6 +105,7 @@ Pose getCurrentPose() {
         //        ROS_INFO("Current pose (x %f) (y %f) (theta %f)", poseService.response.pose.x, poseService.response.pose.y, poseService.response.pose.theta);
     } else {
         ROS_ERROR("Failed to call current_pose service from motion control");
+        ros::shutdown();
     }
 
     return currentPose;
@@ -139,38 +141,80 @@ void publishCmdVel(Twist twist, double t)	{
 }
 
 
-bool motionTurn(Quaternion target) {
-
-    if (target.z > ANGLE_ERROR_ALLOWED || target.z < -ANGLE_ERROR_ALLOWED) {// this allows a theta error
-
-		double t;	// time until stop signal
-		
-		Twist twist;
+void motionTurn(const double theta) {	
+	
+	ros::Rate minimumSleep(1000); //1ms
+	Pose currentPose = getCurrentPose();
+	
+	Twist twist;
+	
+	ROS_INFO("current theta %f, target theta %f", currentPose.orientation.z * 180 / M_PI, theta * 180 / M_PI);
+	
+	if(fmod(currentPose.orientation.z - theta + (M_PI*2), M_PI*2) <= M_PI)	{
+		twist.angular.z = -TURN_VELOCITY;
+	} else {
 		twist.angular.z = TURN_VELOCITY;
-		
-		t = target.z / TURN_VELOCITY;
-		
-		publishCmdVel(twist, t);
+	}
+	
+	pubCmdVel.publish(twist);
 
-        return true;
-    } else
-        return false;
+	
+	while(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
+		currentPose = getCurrentPose();
+
+		minimumSleep.sleep();
+	}
+	
+	Twist twist_stop; // stop moving
+	pubCmdVel.publish(twist_stop);
+
 }
 
-bool motionForward(Point target) {
+
+bool motionForward(const Point target) {
 
     if (target.x > DISTANCE_ERROR_ALLOWED) {
 		
-		double t;	// time until stop signal
+		 const Pose originalPose = getCurrentPose();
 		
-		Twist twist;
-		twist.linear.x = MOTION_VELOCITY;
+		double distanceLeft = target.x;
+		double rateHz = 0.2;
+		ros::Rate rate(1 / rateHz);
 		
-		t = target.x / MOTION_VELOCITY;
+		for(double s = MOTION_VELOCITY / 16; s <= MOTION_VELOCITY; s *= 2)	{	// total distance travelled during this phase should be 0.0775 meter
+			Twist twist;
+			twist.linear.x = s;
+			
+			pubCmdVel.publish(twist);
+			
+			rate.sleep();
+		}
 		
-		ROS_INFO("started timer");
-
-		publishCmdVel(twist, t);
+		ros::Rate minimumSleep(1000); //1ms
+		Pose currentPose = getCurrentPose();
+		//double t;
+		while((target.x - sqrt(pow(currentPose.position.x - originalPose.position.x, 2) + pow(currentPose.position.y - originalPose.position.y, 2))) > 0.0775)	{
+			currentPose = getCurrentPose();
+			minimumSleep.sleep();
+		}
+		rate.sleep();	// HACK: otherwise it wont reach target, i guess inertia etc
+		
+		for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
+			
+			Twist twist;
+			twist.linear.x = s;
+			
+			pubCmdVel.publish(twist);
+			
+			rate.sleep();
+		}
+		
+		ROS_INFO("pose %f, %f", getCurrentPose().position.x, getCurrentPose().position.y);
+		
+		Twist twist; // stop moving
+		pubCmdVel.publish(twist);
+		
+		pubNavigationStateHelper(NAV_POSE_REACHED);
 
         return true;
     } else
@@ -197,12 +241,11 @@ void navigate() {
 
                 ROS_INFO("waypoint list empty, assuming end orientation");
 
-                geometry_msgs::Quaternion endOrientation;
-                endOrientation.z = calcShortestTurn(mEndOrientation, getCurrentPose().orientation.z);
-
-                motionTurn(endOrientation);
+                motionTurn(mEndOrientation);
                 
                 mCurrentPath->pop_front();
+                
+                pubNavigationStateHelper(NAV_READY);
 
             } else {
 
@@ -249,40 +292,36 @@ void navigate() {
             double a1 = atan2(absoluteTargetPose.pose.position.y - currentPose.position.y, absoluteTargetPose.pose.position.x - currentPose.position.x); // calc turn towards next point
             double a2 = currentPose.orientation.z;
 
-            relativeTargetPose.orientation.z = calcShortestTurn(a1, a2); // determine shortest turn (CW or CCW)
+            //relativeTargetPose.orientation.z = calcShortestTurn(a1, a2); // determine shortest turn (CW or CCW)
+			
+			// turn to absolute theta
+            motionTurn(a1);// { //if false, angle falls within the allowed error value, so now we move forward
+
+			//ROS_INFO("skipping turn of %f degrees", relativeTargetPose.orientation.z * 180 / M_PI);
+
+			//relativeTargetPose.orientation.z = 0; // theta no longer used
+
+			relativeTargetPose.position.x = sqrt(pow(absoluteTargetPose.pose.position.x - currentPose.position.x, 2) + pow(absoluteTargetPose.pose.position.y - currentPose.position.y, 2));
 
 
 
+			if (!motionForward(relativeTargetPose.position)) { // if false, distance falls within the allowed error value, so we have reached the pose
 
-            if (!motionTurn(relativeTargetPose.orientation)) { //if false, angle falls within the allowed error value, so now we move forward
-
-                ROS_INFO("skipping turn of %f degrees", relativeTargetPose.orientation.z * 180 / M_PI);
-
-                relativeTargetPose.orientation.z = 0; // theta no longer used
-
-                relativeTargetPose.position.x = sqrt(pow(absoluteTargetPose.pose.position.x - currentPose.position.x, 2) + pow(absoluteTargetPose.pose.position.y - currentPose.position.y, 2));
-
-
-
-                if (!motionForward(relativeTargetPose.position)) { // if false, distance falls within the allowed error value, so we have reached the pose
-
-                    ROS_INFO("skipping distance of %fm", relativeTargetPose.position.x);
-                    pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
-                    return; // skip the timer and nav state
-                }
-            }
-
-            //set state to moving
-            pubNavigationStateHelper(NAV_MOVING);
+				ROS_INFO("skipping distance of %fm", relativeTargetPose.position.x);
+				pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
+				return; // skip the timer and nav state
+			}
+            
+            
         }
             break;
-        case NAV_AVOIDING:
+        case NAV_AVOIDING: //NYI
             break;
-        case NAV_OBSTACLE_DETECTED:
+        case NAV_OBSTACLE_DETECTED: //NYI
             break;
-        case NAV_CHECKING_OBSTACLE:
+        case NAV_CHECKING_OBSTACLE: //NYI
             break;
-        case NAV_MOVING:
+        case NAV_MOVING: //deprecated?
         {
             // do nothing
         }
@@ -346,13 +385,13 @@ int main(int argc, char **argv) {
     loop_rate.sleep();
     loop_rate.sleep();
 
-    placeholder_ManualTargetPose();
+    //placeholder_ManualTargetPose();
 
     while (ros::ok()) {
 
         ros::spinOnce(); // read topics
 
-       // navigate();
+		navigate();
 
         loop_rate.sleep(); // sleep
     }
