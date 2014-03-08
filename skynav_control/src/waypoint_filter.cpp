@@ -46,36 +46,43 @@ void placeholderGlobalPlannerWaypoints() {
     ps.header.stamp = ros::Time::now();
 
     // start pose, has orientation (should be the same as robots physical orientation)
-    {
-        ps.pose.position.x = 0;
+    //{
+        //ps.pose.position.x = 0;
+        //ps.pose.position.y = 0;
+        //path.poses.push_back(ps);
+    //}
+
+    //{ // no orientation needed
+        //ps.pose.position.x = rectSize;
+        //ps.pose.position.y = 0;
+        //path.poses.push_back(ps);
+    //}
+
+    //{ // no orientation needed
+        //ps.pose.position.x = rectSize;
+        //ps.pose.position.y = rectSize;
+        //path.poses.push_back(ps);
+    //}
+
+    //{ // no orientation needed
+        //ps.pose.position.x = 0;
+        //ps.pose.position.y = rectSize;
+        //path.poses.push_back(ps);
+    //}
+
+    //{ // end pose, needs orientation
+        //ps.pose.position.x = 0;
+        //ps.pose.position.y = 0;
+        //ps.pose.orientation.z = M_PI;   //180 deg
+        //path.poses.push_back(ps);
+    //}
+    
+    
+    { // no orientation needed
+        ps.pose.position.x = 9;
         ps.pose.position.y = 0;
         path.poses.push_back(ps);
-    }
-
-    { // no orientation needed
-        ps.pose.position.x = rectSize;
-        ps.pose.position.y = 0;
-        path.poses.push_back(ps);
-    }
-
-    { // no orientation needed
-        ps.pose.position.x = rectSize;
-        ps.pose.position.y = rectSize;
-        path.poses.push_back(ps);
-    }
-
-    { // no orientation needed
-        ps.pose.position.x = 0;
-        ps.pose.position.y = rectSize;
-        path.poses.push_back(ps);
-    }
-
-    { // end pose, needs orientation
-        ps.pose.position.x = 0;
-        ps.pose.position.y = 0;
-        ps.pose.orientation.z = M_PI;   //180 deg
-        path.poses.push_back(ps);
-    }
+    }   
 
     pubWaypoints.publish(path);
 }
@@ -104,7 +111,7 @@ int main(int argc, char **argv) {
 
 // add a sleep here
 	loop_rate.sleep();
-    placeholderGlobalPlannerWaypoints();
+    //placeholderGlobalPlannerWaypoints();
 
     //add waypoint service to globalnav here
 

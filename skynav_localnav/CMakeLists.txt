@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(skynav_localnav)
 
-find_package(catkin REQUIRED COMPONENTS roscpp skynav_msgs)
+find_package(catkin REQUIRED COMPONENTS roscpp skynav_msgs laser_geometry tf)
 
 catkin_package(
-  CATKIN_DEPENDS roscpp skynav_msgs
+  CATKIN_DEPENDS roscpp skynav_msgs laser_geometry tf
 )
 
 include_directories(include ${catkin_INCLUDE_DIRS})

@@ -8,6 +8,10 @@
 #include <skynav_msgs/current_pose.h>
 #include <skynav_msgs/Object.h>
 #include <set>
+#include <sensor_msgs/LaserScan.h>
+#include <laser_geometry/laser_geometry.h>
+#include <tf/transform_listener.h>
+
 
 using namespace std;
 using namespace geometry_msgs;
@@ -35,8 +39,11 @@ int mObjectsFound = 0;
 ros::Publisher pubObjects, pubObstacles, pubSensorData;
 ros::ServiceClient servClientCurrentPose;
 
+laser_geometry::LaserProjection mLaserProjector;
+tf::TransformListener* mTransformListener;
+
 set<Point32, compPoint> mSensorData;
-vector<skynav_msgs::Object> mObjects;
+vector<PointCloud> mObjects;
 
 Pose getCurrentPose() {
 
@@ -83,7 +90,7 @@ static bool pointInRange(const Point32* a, const Point32* b, const double search
     return false;
 }
 
-void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
+void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {	// for x80 sonar/IR sensors
 
     Pose currentPose = getCurrentPose();
 
@@ -102,7 +109,7 @@ void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
             double objectY = (sin(alpha) * distance) + currentPose.position.y + rangeMsg.yOffsetFromCenter; // y
 
             Point32 p;
-            p.x = double(int(objectX * 1000)) / 1000; // truncate values to mm
+            p.x = double(int(objectX * 1000)) / 1000; // truncate values to mm (because sonar and IR return very specific values that fall outside their precision)
             p.y = double(int(objectY * 1000)) / 1000;
 
             pointCloud.points.push_back(p);
@@ -118,19 +125,38 @@ void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
     }
 }
 
+void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
+	
+	 if(!mTransformListener->waitForTransform(scan_in->header.frame_id, "/map", scan_in->header.stamp + ros::Duration().fromSec(scan_in->ranges.size()*scan_in->time_increment), ros::Duration(1.0)))	{
+		return;
+	}	
+	
+	PointCloud pointCloud;
+	
+	mLaserProjector.transformLaserScanToPointCloud("/map", *scan_in, pointCloud, *mTransformListener);
+	
+	if (pointCloud.points.size() > 0) {
+
+        pointCloud.header.stamp = ros::Time::now();
+        pointCloud.header.frame_id = "/map";
+
+        pubSensorData.publish(pointCloud);
+    }	
+}
+
 void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
     // some vars
     const double xySearchDistance = 0.1; // 10cm        //TODO should be settable somewhere 
 
-    skynav_msgs::Object objectHandle;
+    PointCloud objectHandle;
 
     // now we can check our newest points with the ones already in memory, find other points that are nearby and points near the found points
     for (uint i = 0; i < msg->points.size(); ++i) {
         
-        vector<Point32> foundPoints;
+        PointCloud foundPoints;
 
         // check if objects were found nearby
-        vector<skynav_msgs::Object>::iterator firstObjectIt;
+        vector<PointCloud>::iterator firstObjectIt;
 
         for (firstObjectIt = mObjects.begin(); firstObjectIt != mObjects.end(); ++firstObjectIt) {
 
@@ -148,7 +174,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                     objectHandle = (*firstObjectIt); // save object for publishing later
 
                     // point is added to object, now check if the point is also in range of another object
-                    vector<skynav_msgs::Object>::iterator secondObjectIt;
+                    vector<PointCloud>::iterator secondObjectIt;
 
                     for (secondObjectIt = firstObjectIt + 1; secondObjectIt != mObjects.end();) {
                         bool erasedObject = false;
@@ -163,15 +189,11 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                                     addOriginalPoint = false;
                                 }
 
-                                //                                ROS_INFO("merged objects");
+                                                        //       ROS_INFO("merged objects");
 
                                 // merge the two objects
                                 (*firstObjectIt).points.insert((*firstObjectIt).points.end(), (*secondObjectIt).points.begin(), (*secondObjectIt).points.end()); // add all points from 2nd vector to the first
                                 (*secondObjectIt).points.clear(); // empty vector
-
-                                // publish the second object with an empty points[], this will cause python to drop the object
-                                pubObjects.publish((*secondObjectIt));
-
 
                                 erasedObject = true;
                                 secondObjectIt = mObjects.erase(secondObjectIt); // remove locally, can re-use the index for it
@@ -191,7 +213,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                         (*firstObjectIt).points.push_back(msg->points.at(i));
                     }
 
-                    goto objectFound;
+                    return;	
                 }
             }
         }
@@ -203,35 +225,43 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 
             if( pointInRange( &(*sensor_it), &(msg->points.at(i)), xySearchDistance))   {       //if point near other point
 
-                foundPoints.push_back((*sensor_it));
+                foundPoints.points.push_back((*sensor_it));
                 mSensorData.erase(sensor_it--); // is this safe?
             }
         }
 
-        if (foundPoints.size() > 0) { // if points were found nearby
+        if (foundPoints.points.size() > 0) { // if points were found nearby
 
-            foundPoints.push_back(msg->points.at(i)); // add the reference point, since it was not added anywhere yet
-
-            // init new object
-
-            objectHandle.uniqueID = mObjects.size();
-            objectHandle.points = foundPoints;
-            mObjects.push_back(objectHandle);
+            foundPoints.points.push_back(msg->points.at(i)); // add the reference point, since it was not added anywhere yet
+            
+            foundPoints.header.stamp = ros::Time(0);
+            foundPoints.header.frame_id = "/map";
+            
+            mObjects.push_back(foundPoints);
 
         } else { // no nearby points found
 
             // if no object found either, save the point for future searching
             mSensorData.insert(msg->points.at(i)); // note that a set is used because this prevents duplicates
-            return; // we dont want to publish because there is no valid object
         }
     }
-
-objectFound: // so the rest of the for loops are skipped rather than executed pointlessly
-
-
-    pubObjects.publish(objectHandle); // this causes issues in the python GUI (cannot find the point[] for unknown reason), so workaround: publish each point seperately with an ID
-
 }
+
+void publishObjects()	{
+	
+	ROS_INFO("%lu objects", mObjects.size());
+	
+	vector<PointCloud>::iterator it;
+	
+	for(it = mObjects.begin(); it != mObjects.end(); ++it)	{
+		
+		//(*it).header.stamp = ros::Time::now();
+		ROS_INFO("contains %lu", (*it).points.size());
+		pubObjects.publish( (*it) );
+	}
+	
+}
+
 
 void subObstacleDetectionCallback(const skynav_msgs::Object::ConstPtr & msg) {
     // receive all objects and determine if they are obstacles (on the path)
@@ -248,28 +278,34 @@ int main(int argc, char **argv) {
 
     //pubs
     pubSensorData = n.advertise<sensor_msgs::PointCloud>("sensor_data", 1024);
-    pubObjects = n.advertise<skynav_msgs::Object>("objects", 256);
+    pubObjects = n.advertise<PointCloud>("objects", 256);
     pubObstacles = n.advertise<skynav_msgs::Object>("obstacles", 256);
 
     //subs
     ros::Subscriber subSensors = n_control.subscribe("sensors", 1024, subSensorCallback); // raw unprocessed sensor values
     ros::Subscriber subSensorData = n.subscribe("sensor_data", 256, subObjectDetectionCallback);
     //    ros::Subscriber subObjects = n.subscribe("objects", 256, subObstacleDetectionCallback);
+    ros::Subscriber subLaser = n_control.subscribe("laser_scan", 1024, subLaserScanCallback);
 
     //services
     servClientCurrentPose = n_SLAM.serviceClient<skynav_msgs::current_pose>("current_pose");
+    
+    mTransformListener = new tf::TransformListener();
 
-    ros::spin();
-
-    //    ros::Rate loop_rate(10);    // to update every 100ms rather than whenever new sensor data comes in (which is far too often))
-    //
-    //    while (ros::ok()) {
-    //        
-    //        ros::spinOnce();
-    //        
-    //        loop_rate.sleep();
-    //    }
-    //    
+    ros::Rate loop_rate(1);
+	
+	while (ros::ok()) {
+            
+		ros::spinOnce();
+		
+		publishObjects();
+		
+		loop_rate.sleep();
+		
+	}
+        
+    
+    delete mTransformListener;
 
 
     return 0;

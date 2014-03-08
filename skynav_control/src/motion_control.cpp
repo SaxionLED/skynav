@@ -13,7 +13,7 @@
 // defines
 #define MOTION_VELOCITY                	0.2                      // speed in m/s
 #define TURN_VELOCITY					0.5						// turn speed in rad/s
-#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 1          // rads
+#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 0.5          // rads	// if too small, the robot may rotate infinitely
 #define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
 #define ROBOT_WAYPOINT_ACCURACY         false                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
@@ -73,7 +73,7 @@ void pubNavigationStateHelper(NAVIGATION_STATE state) {
     std_msgs::UInt8 pubmsg;
     pubmsg.data = state;
     pubNavigationState.publish(pubmsg);
-    ROS_INFO("nav state changed to %u", state);
+    //ROS_INFO("nav state changed to %u", state);
 }
 
 void clearPath() {
@@ -148,8 +148,6 @@ void motionTurn(const double theta) {
 	
 	Twist twist;
 	
-	ROS_INFO("current theta %f, target theta %f", currentPose.orientation.z * 180 / M_PI, theta * 180 / M_PI);
-	
 	if(fmod(currentPose.orientation.z - theta + (M_PI*2), M_PI*2) <= M_PI)	{
 		twist.angular.z = -TURN_VELOCITY;
 	} else {
@@ -193,7 +191,7 @@ bool motionForward(const Point target) {
 		ros::Rate minimumSleep(1000); //1ms
 		Pose currentPose = getCurrentPose();
 		//double t;
-		while((target.x - sqrt(pow(currentPose.position.x - originalPose.position.x, 2) + pow(currentPose.position.y - originalPose.position.y, 2))) > 0.0775)	{
+		while((target.x - sqrt(pow(currentPose.position.x - originalPose.position.x, 2) + pow(currentPose.position.y - originalPose.position.y, 2))) > 0.0775)	{	// TODO the 0.0775 should be a var and should be checked
 			currentPose = getCurrentPose();
 			minimumSleep.sleep();
 		}
@@ -209,7 +207,7 @@ bool motionForward(const Point target) {
 			rate.sleep();
 		}
 		
-		ROS_INFO("pose %f, %f", getCurrentPose().position.x, getCurrentPose().position.y);
+		//ROS_INFO("pose %f, %f", getCurrentPose().position.x, getCurrentPose().position.y);
 		
 		Twist twist; // stop moving
 		pubCmdVel.publish(twist);
