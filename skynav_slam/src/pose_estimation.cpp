@@ -110,7 +110,7 @@ int main(int argc, char **argv) {
 
     ros::init(argc, argv, "pose_estimation");
 
-    ros::NodeHandle n("/SLAM");
+    ros::NodeHandle n("/slam");
     ros::NodeHandle n_control("/control");
     
     // init
