@@ -68,8 +68,7 @@ static bool pointExists(const Point32* a, vector<Point32>* vec) {
     vector<Point32>::iterator it;
 
     for (it = vec->begin(); it != vec->end(); ++it) {
-
-        if ((*it).x == a->x && (*it).y == a->y)
+		if ((*it).x == a->x && (*it).y == a->y)
             return true;
     }
 
@@ -124,7 +123,8 @@ void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {	//
         pubSensorData.publish(pointCloud);
     }
 }
-
+//receive laserscan data and convert to pointcloud
+//move this function to data_verifier.cpp !?
 void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
 	
 	 if(!mTransformListener->waitForTransform(scan_in->header.frame_id, "/map", scan_in->header.stamp + ros::Duration().fromSec(scan_in->ranges.size()*scan_in->time_increment), ros::Duration(1.0)))	{
@@ -132,10 +132,23 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
 	}	
 	
 	PointCloud pointCloud;
-	
-	mLaserProjector.transformLaserScanToPointCloud("/map", *scan_in, pointCloud, *mTransformListener);
-	
+	try
+	{
+		mLaserProjector.transformLaserScanToPointCloud("/map", *scan_in, pointCloud, *mTransformListener);
+	}
+	catch (tf::TransformException& e)
+	{
+		ROS_ERROR("%s", e.what());
+	}
+
 	if (pointCloud.points.size() > 0) {
+		
+		//truncate pointcloud coordinates to cm. should be to mm?
+		for(vector<Point32>::iterator it = pointCloud.points.begin(); it != pointCloud.points.end(); it++){
+			(*it).x = floorf((*it).x *100)/100;
+			(*it).y = floorf((*it).y *100)/100;
+			(*it).z = floorf((*it).z *100)/100;
+		}			
 
         pointCloud.header.stamp = ros::Time::now();
         pointCloud.header.frame_id = "/map";
@@ -144,6 +157,7 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
     }	
 }
 
+//detect objects within sensor range, compare to known objects and add/merge in object list
 void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
     // some vars
     const double xySearchDistance = 0.1; // 10cm        //TODO should be settable somewhere 
@@ -160,8 +174,8 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 
         for (firstObjectIt = mObjects.begin(); firstObjectIt != mObjects.end(); ++firstObjectIt) {
 
-            for (uint firstPoints = 0; firstPoints < (*firstObjectIt).points.size(); ++firstPoints) {
-
+            for (uint firstPoints = 0; firstPoints < (*firstObjectIt).points.size(); ++firstPoints) {  
+                
                 if( pointInRange(&((*firstObjectIt).points.at(firstPoints)), &(msg->points.at(i)), xySearchDistance))   { // if point within range of another point
                 
                     // if true, the coordinate is within xySearchDistance of any of the coordinates contained in the object and we should add it to that object
@@ -189,14 +203,13 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                                     addOriginalPoint = false;
                                 }
 
-                                                        //       ROS_INFO("merged objects");
-
                                 // merge the two objects
                                 (*firstObjectIt).points.insert((*firstObjectIt).points.end(), (*secondObjectIt).points.begin(), (*secondObjectIt).points.end()); // add all points from 2nd vector to the first
                                 (*secondObjectIt).points.clear(); // empty vector
 
                                 erasedObject = true;
                                 secondObjectIt = mObjects.erase(secondObjectIt); // remove locally, can re-use the index for it
+                                //ROS_INFO("merged objects");
 
                                 break; // if point is in range, this needs not be executed again for that object
 
@@ -247,6 +260,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
     }
 }
 
+//publish all known objects
 void publishObjects()	{
 	
 	ROS_INFO("%lu objects", mObjects.size());
@@ -262,10 +276,9 @@ void publishObjects()	{
 	
 }
 
-
+// receive all objects and determine if they are obstacles (on the path)
 void subObstacleDetectionCallback(const skynav_msgs::Object::ConstPtr & msg) {
-    // receive all objects and determine if they are obstacles (on the path)
-
+    //TODO 
 }
 
 int main(int argc, char **argv) {
