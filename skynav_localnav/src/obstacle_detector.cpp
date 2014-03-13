@@ -287,7 +287,7 @@ int main(int argc, char **argv) {
 
     ros::NodeHandle n("/localnav");
     ros::NodeHandle n_control("/control");
-    ros::NodeHandle n_SLAM("/SLAM");
+    ros::NodeHandle n_SLAM("/slam");
 
     //pubs
     pubSensorData = n.advertise<sensor_msgs::PointCloud>("sensor_data", 1024);

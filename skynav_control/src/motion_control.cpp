@@ -361,7 +361,7 @@ int main(int argc, char **argv) {
 
 	ros::NodeHandle n = ros::NodeHandle("");
     mNode = new ros::NodeHandle("/control");
-    mNodeSLAM = new ros::NodeHandle("/SLAM");
+    mNodeSLAM = new ros::NodeHandle("/slam");
 
 
     //pubs
