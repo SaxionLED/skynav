@@ -239,9 +239,11 @@ void navigate() {
 
                 ROS_INFO("waypoint list empty, assuming end orientation");
 
-                motionTurn(mEndOrientation);
+                //motionTurn(mEndOrientation); //function is blocking when not mEndOrientation is not reached
                 
                 mCurrentPath->pop_front();
+                
+                ROS_INFO("Target reached");
                 
                 pubNavigationStateHelper(NAV_READY);
 

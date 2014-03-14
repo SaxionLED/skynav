@@ -18,7 +18,7 @@ void subNavigationStateCallback(const std_msgs::UInt8::ConstPtr& msg) {
 void subGlobalPlannerWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 
     //TODO use path_check in the LocalNav module
-
+	ROS_INFO("received new path from GlobalNav");
     pubWaypoints.publish(msg);
 }
 
@@ -79,7 +79,7 @@ void placeholderGlobalPlannerWaypoints() {
     
     
     { // no orientation needed
-        ps.pose.position.x = 9;
+        ps.pose.position.x = 10;
         ps.pose.position.y = 0;
         path.poses.push_back(ps);
     }   
@@ -107,10 +107,11 @@ int main(int argc, char **argv) {
     //service
     ros::ServiceClient servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
 
-    ros::Rate loop_rate(0.5);
+    ros::Rate loop_rate(1);
 
 // add a sleep here
 	loop_rate.sleep();
+	
     //placeholderGlobalPlannerWaypoints();
 
     //add waypoint service to globalnav here

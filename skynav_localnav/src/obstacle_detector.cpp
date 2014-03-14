@@ -43,7 +43,7 @@ laser_geometry::LaserProjection mLaserProjector;
 tf::TransformListener* mTransformListener;
 
 set<Point32, compPoint> mSensorData;
-vector<PointCloud> mObjects;
+vector<PointCloud> mObjects;	//objects in memory
 
 Pose getCurrentPose() {
 
@@ -161,7 +161,7 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
 void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
     // some vars
     const double xySearchDistance = 0.1; // 10cm        //TODO should be settable somewhere 
-
+	
     PointCloud objectHandle;
 
     // now we can check our newest points with the ones already in memory, find other points that are nearby and points near the found points
@@ -291,12 +291,12 @@ int main(int argc, char **argv) {
 
     //pubs
     pubSensorData = n.advertise<sensor_msgs::PointCloud>("sensor_data", 1024);
-    pubObjects = n.advertise<PointCloud>("objects", 256);
-    pubObstacles = n.advertise<skynav_msgs::Object>("obstacles", 256);
+    pubObjects = n.advertise<PointCloud>("objects", 1024);
+    pubObstacles = n.advertise<skynav_msgs::Object>("obstacles", 1024);
 
     //subs
     ros::Subscriber subSensors = n_control.subscribe("sensors", 1024, subSensorCallback); // raw unprocessed sensor values
-    ros::Subscriber subSensorData = n.subscribe("sensor_data", 256, subObjectDetectionCallback);
+    ros::Subscriber subSensorData = n.subscribe("sensor_data", 1024, subObjectDetectionCallback);
     //    ros::Subscriber subObjects = n.subscribe("objects", 256, subObstacleDetectionCallback);
     ros::Subscriber subLaser = n_control.subscribe("laser_scan", 1024, subLaserScanCallback);
 

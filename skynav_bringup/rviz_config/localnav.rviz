@@ -158,9 +158,9 @@ Visualization Manager:
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: -6.75447e-06
+      Max Intensity: -2.04905e-08
       Min Color: 0; 0; 0
-      Min Intensity: -6.75454e-06
+      Min Intensity: -6.71192e-06
       Name: LaserScan
       Position Transformer: XYZ
       Queue Size: 10
@@ -217,7 +217,7 @@ Visualization Manager:
       Class: rviz/PointCloud
       Color: 255; 255; 255
       Color Transformer: Intensity
-      Decay Time: 0
+      Decay Time: 1
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
@@ -226,7 +226,7 @@ Visualization Manager:
       Min Intensity: 0
       Name: LocalNav Objects
       Position Transformer: XYZ
-      Queue Size: 10
+      Queue Size: 30
       Selectable: true
       Size (Pixels): 3
       Size (m): 0.05
@@ -259,17 +259,17 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 14.9718
+      Distance: 26.2272
       Focal Point:
-        X: -3.01342
-        Y: 2.5425
-        Z: -1.50506
+        X: -1.53014
+        Y: 3.36185
+        Z: -4.02519
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.509797
+      Pitch: 0.454797
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 5.5654
+      Yaw: 5.9854
     Saved: ~
 Window Geometry:
   Displays:
