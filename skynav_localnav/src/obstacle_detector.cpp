@@ -64,28 +64,31 @@ Pose getCurrentPose() {
 }
 
 static bool pointExists(const Point32* a, vector<Point32>* vec) {
-
+	const double xyRange = 0.001; //within 1 mm, it is concidered the same coordinate
     vector<Point32>::iterator it;
 
     for (it = vec->begin(); it != vec->end(); ++it) {
-		if ((*it).x == a->x && (*it).y == a->y)
+		double distance = sqrt(((*it).x - a->x)*((*it).x - a->x) + ((*it).y == a->y)*((*it).y == a->y));
+		
+		if(((*it).x == a->x && (*it).y == a->y)||distance <= xyRange){
             return true;
+		}
     }
 
     return false;
 }
 
 static bool pointInRange(const Point32* a, const Point32* b, const double searchDistance) {
-
-    if (
-            a->x <= b->x + searchDistance &&    //TODO could be replaced by magnitude (circular search distance)
-            a->x >= b->x - searchDistance &&    // currently it searches within a square
-            a->y <= b->y + searchDistance &&
-            a->y >= b->y - searchDistance) {
-
-        return true;
-    }
-
+    //if (
+            //a->x <= b->x + searchDistance &&    //TODO could be replaced by magnitude (circular search distance)
+            //a->x >= b->x - searchDistance &&    // currently it searches within a square
+            //a->y <= b->y + searchDistance &&
+            //a->y >= b->y - searchDistance) {
+		double xyRange = sqrt((a->x -b->x)*(a->x -b->x) +(a->y - b->y)*(a->y - b->y));
+		if(xyRange <= searchDistance){
+			return true;
+		}
+    
     return false;
 }
 
@@ -143,11 +146,11 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
 
 	if (pointCloud.points.size() > 0) {
 		
-		//truncate pointcloud coordinates to cm. should be to mm?
+		//truncate pointcloud coordinates to mm.
 		for(vector<Point32>::iterator it = pointCloud.points.begin(); it != pointCloud.points.end(); it++){
-			(*it).x = floorf((*it).x *100)/100;
-			(*it).y = floorf((*it).y *100)/100;
-			(*it).z = floorf((*it).z *100)/100;
+			(*it).x = floorf((*it).x *1000)/1000;
+			(*it).y = floorf((*it).y *1000)/1000;
+			(*it).z = floorf((*it).z *1000)/1000;
 		}			
 
         pointCloud.header.stamp = ros::Time::now();
@@ -163,7 +166,6 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
     const double xySearchDistance = 0.1; // 10cm        //TODO should be settable somewhere 
 	
     PointCloud objectHandle;
-
     // now we can check our newest points with the ones already in memory, find other points that are nearby and points near the found points
     for (uint i = 0; i < msg->points.size(); ++i) {
     
