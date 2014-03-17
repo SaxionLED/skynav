@@ -13,7 +13,7 @@
 // defines
 #define MOTION_VELOCITY                	0.2                      // speed in m/s
 #define TURN_VELOCITY					0.5						// turn speed in rad/s
-#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 0.5          // rads	// if too small, the robot may rotate infinitely
+#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 1          // rads	// if too small, the robot may rotate infinitely
 #define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
 #define ROBOT_WAYPOINT_ACCURACY         false                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target

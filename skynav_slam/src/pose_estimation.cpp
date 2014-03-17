@@ -57,7 +57,7 @@ bool servServerCurrentPoseCallback(skynav_msgs::current_pose::Request &request, 
     return true;
 }
 
-void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg) {
+void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg) {		// this is currently only called by the actual robot, not simulator
 
     if (mFirstDataSkipped) {
         if (msg->position.x != 0.0 || msg->position.y != 0.0 || msg->orientation.z != 0.0) {
@@ -101,6 +101,27 @@ void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg) {
 
 
 void publishTraversedPath()     {
+	
+	PoseStamped ps;
+	
+	tf::StampedTransform st;
+    
+    try {
+		mTransformListener->lookupTransform("/map", "/base_link", ros::Time(0), st);
+	}	catch (tf::TransformException ex)	{
+		ROS_ERROR("%s", ex.what());
+		return;
+	}
+	
+    ps.pose.position.x = st.getOrigin().x();
+    ps.pose.position.y = st.getOrigin().y();
+    ps.pose.orientation.z = tf::getYaw(st.getRotation());
+    
+		// add new pose to traversed path
+	ps.header.frame_id = "/map";
+	ps.header.stamp = ros::Time::now();
+	
+	mTraversedPath.poses.push_back(ps);
     
     
     pubTraversedPath.publish(mTraversedPath);    
