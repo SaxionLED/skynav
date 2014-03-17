@@ -166,7 +166,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 
     // now we can check our newest points with the ones already in memory, find other points that are nearby and points near the found points
     for (uint i = 0; i < msg->points.size(); ++i) {
-        
+    
         PointCloud foundPoints;
 
         // check if objects were found nearby
@@ -226,7 +226,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                         (*firstObjectIt).points.push_back(msg->points.at(i));
                     }
 
-                    return;	
+                    break;	
                 }
             }
         }
@@ -235,8 +235,8 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 
         set<Point32>::iterator sensor_it;
         for (sensor_it = mSensorData.begin(); sensor_it != mSensorData.end(); ++sensor_it) {
-
-            if( pointInRange( &(*sensor_it), &(msg->points.at(i)), xySearchDistance))   {       //if point near other point
+			
+			if( pointInRange( &(*sensor_it), &(msg->points.at(i)), xySearchDistance))   {       //if point near other point
 
                 foundPoints.points.push_back((*sensor_it));
                 mSensorData.erase(sensor_it--); // is this safe?
@@ -253,7 +253,6 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
             mObjects.push_back(foundPoints);
 
         } else { // no nearby points found
-
             // if no object found either, save the point for future searching
             mSensorData.insert(msg->points.at(i)); // note that a set is used because this prevents duplicates
         }
