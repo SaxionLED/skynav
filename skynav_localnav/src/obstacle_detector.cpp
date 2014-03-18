@@ -63,29 +63,32 @@ Pose getCurrentPose() {
     return currentPose;
 }
 
+//determine if a point already exist in a list of points.
 static bool pointExists(const Point32* a, vector<Point32>* vec) {
-	const double xyRange = 0.001; //within 1 mm, it is concidered the same coordinate
+	const double xyRange = 0.0005; //within 0.5 mm, it is concidered the same coordinate
     vector<Point32>::iterator it;
 
     for (it = vec->begin(); it != vec->end(); ++it) {
-		double distance = sqrt(((*it).x - a->x)*((*it).x - a->x) + ((*it).y == a->y)*((*it).y == a->y));
 		
-		if(((*it).x == a->x && (*it).y == a->y)||distance <= xyRange){
+		
+		if(((*it).x == a->x && (*it).y == a->y)){	//point coordinates are exactly the same
             return true;
 		}
-    }
+		
+		double xyDistance = sqrt(((*it).x - a->x)*((*it).x - a->x) + ((*it).y == a->y)*((*it).y == a->y));
+		if (xyDistance <= xyRange){					//point exist by close proximity ( taken accuracy of sensor in consideration)
+			return true;							
+		}
+    }	
 
-    return false;
+    return false;									//point does not already exist
 }
 
+//determine if two points are within a certain distance to eachother
 static bool pointInRange(const Point32* a, const Point32* b, const double searchDistance) {
-    //if (
-            //a->x <= b->x + searchDistance &&    //TODO could be replaced by magnitude (circular search distance)
-            //a->x >= b->x - searchDistance &&    // currently it searches within a square
-            //a->y <= b->y + searchDistance &&
-            //a->y >= b->y - searchDistance) {
-		double xyRange = sqrt((a->x -b->x)*(a->x -b->x) +(a->y - b->y)*(a->y - b->y));
-		if(xyRange <= searchDistance){
+
+		double xyDistance = sqrt((a->x -b->x)*(a->x -b->x) +(a->y - b->y)*(a->y - b->y));	//use pythagoras to determine if coordinates of a are within certain range of b
+		if(xyDistance <= searchDistance){														
 			return true;
 		}
     
@@ -146,11 +149,11 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
 
 	if (pointCloud.points.size() > 0) {
 		
-		//truncate pointcloud coordinates to mm.
+		//truncate pointcloud coordinates to cm.
 		for(vector<Point32>::iterator it = pointCloud.points.begin(); it != pointCloud.points.end(); it++){
-			(*it).x = floorf((*it).x *1000)/1000;
-			(*it).y = floorf((*it).y *1000)/1000;
-			(*it).z = floorf((*it).z *1000)/1000;
+			(*it).x = floorf((*it).x *100)/100;
+			(*it).y = floorf((*it).y *100)/100;
+			(*it).z = floorf((*it).z *100)/100;
 		}			
 
         pointCloud.header.stamp = ros::Time::now();
@@ -165,7 +168,6 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
     // some vars
     const double xySearchDistance = 0.1; // 10cm        //TODO should be settable somewhere 
 	
-    PointCloud objectHandle;
     // now we can check our newest points with the ones already in memory, find other points that are nearby and points near the found points
     for (uint i = 0; i < msg->points.size(); ++i) {
     
@@ -186,8 +188,6 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                     if (pointExists(&(msg->points.at(i)), &((*firstObjectIt).points))) { // do not add duplicates
                         addOriginalPoint = false; // point is already in the object, prevent adding it twice 
                     }
-
-                    objectHandle = (*firstObjectIt); // save object for publishing later
 
                     // point is added to object, now check if the point is also in range of another object
                     vector<PointCloud>::iterator secondObjectIt;
@@ -228,7 +228,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                         (*firstObjectIt).points.push_back(msg->points.at(i));
                     }
 
-                    break;	
+                    goto nextNewPoint;	
                 }
             }
         }
@@ -239,10 +239,9 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
         for (sensor_it = mSensorData.begin(); sensor_it != mSensorData.end(); ++sensor_it) {
 			
 			if( pointInRange( &(*sensor_it), &(msg->points.at(i)), xySearchDistance))   {       //if point near other point
-
                 foundPoints.points.push_back((*sensor_it));
                 mSensorData.erase(sensor_it--); // is this safe?
-            }
+                }
         }
 
         if (foundPoints.points.size() > 0) { // if points were found nearby
@@ -258,6 +257,10 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
             // if no object found either, save the point for future searching
             mSensorData.insert(msg->points.at(i)); // note that a set is used because this prevents duplicates
         }
+        
+        // this skips everything and restarts the first for loop. should only be called when a new point (from msg) has been added to an object.
+        nextNewPoint:
+        
     }
 }
 
