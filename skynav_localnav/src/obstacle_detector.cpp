@@ -228,7 +228,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                         (*firstObjectIt).points.push_back(msg->points.at(i));
                     }
 
-                    break;	
+                    goto nextNewPoint;	
                 }
             }
         }
@@ -257,6 +257,10 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
             // if no object found either, save the point for future searching
             mSensorData.insert(msg->points.at(i)); // note that a set is used because this prevents duplicates
         }
+        
+        // this skips everything and restarts the first for loop. should only be called when a new point (from msg) has been added to an object.
+        nextNewPoint:
+        
     }
 }
 
