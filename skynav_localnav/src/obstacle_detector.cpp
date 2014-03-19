@@ -149,11 +149,11 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
 
 	if (pointCloud.points.size() > 0) {
 		
-		//truncate pointcloud coordinates to cm.
+		//truncate pointcloud coordinates to mm precision.
 		for(vector<Point32>::iterator it = pointCloud.points.begin(); it != pointCloud.points.end(); it++){
-			(*it).x = floorf((*it).x *100)/100;
-			(*it).y = floorf((*it).y *100)/100;
-			(*it).z = floorf((*it).z *100)/100;
+			(*it).x = floorf((*it).x *1000)/1000;
+			(*it).y = floorf((*it).y *1000)/1000;
+			(*it).z = floorf((*it).z *1000)/1000;
 		}			
 
         pointCloud.header.stamp = ros::Time::now();
@@ -172,6 +172,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
     for (uint i = 0; i < msg->points.size(); ++i) {
     
         PointCloud foundPoints;
+		set<Point32>::iterator sensor_it;
 
         // check if objects were found nearby
         vector<PointCloud>::iterator firstObjectIt;
@@ -235,7 +236,6 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 
         // no objects nearby were found, check if there are any single points nearby to create a new object out of
 
-        set<Point32>::iterator sensor_it;
         for (sensor_it = mSensorData.begin(); sensor_it != mSensorData.end(); ++sensor_it) {
 			
 			if( pointInRange( &(*sensor_it), &(msg->points.at(i)), xySearchDistance))   {       //if point near other point
@@ -260,6 +260,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
         
         // this skips everything and restarts the first for loop. should only be called when a new point (from msg) has been added to an object.
         nextNewPoint:
+        asm("NOP");
         
     }
 }
