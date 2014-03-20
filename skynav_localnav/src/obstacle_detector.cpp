@@ -65,7 +65,7 @@ Pose getCurrentPose() {
 
 //determine if a point already exist in a list of points.
 static bool pointExists(const Point32* a, vector<Point32>* vec) {
-	const double xyRange = 0.0005; //within 0.5 mm, it is concidered the same coordinate
+	const double xyRange = 0.005; //within 0.5 cm, it is concidered the same coordinate
     vector<Point32>::iterator it;
 
     for (it = vec->begin(); it != vec->end(); ++it) {
@@ -75,7 +75,7 @@ static bool pointExists(const Point32* a, vector<Point32>* vec) {
             return true;
 		}
 		
-		double xyDistance = sqrt(((*it).x - a->x)*((*it).x - a->x) + ((*it).y == a->y)*((*it).y == a->y));
+		double xyDistance = sqrt(pow((*it).x - a->x,2) + (pow((*it).y - a->y,2)));
 		if (xyDistance <= xyRange){					//point exist by close proximity ( taken accuracy of sensor in consideration)
 			return true;							
 		}
@@ -87,7 +87,7 @@ static bool pointExists(const Point32* a, vector<Point32>* vec) {
 //determine if two points are within a certain distance to eachother
 static bool pointInRange(const Point32* a, const Point32* b, const double searchDistance) {
 
-		double xyDistance = sqrt((a->x -b->x)*(a->x -b->x) +(a->y - b->y)*(a->y - b->y));	//use pythagoras to determine if coordinates of a are within certain range of b
+		double xyDistance = sqrt(pow((a->x -b->x),2) + pow((a->y - b->y),2));	//use pythagoras to determine if coordinates of a are within certain range of b
 		if(xyDistance <= searchDistance){														
 			return true;
 		}
