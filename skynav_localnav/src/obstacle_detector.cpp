@@ -95,6 +95,11 @@ static bool pointInRange(const Point32* a, const Point32* b, const double search
     return false;
 }
 
+//truncate values (in meters) to mm precision
+float truncateValue(const float value){
+	return floorf(value*1000)/1000; 
+}
+
 void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {	// for x80 sonar/IR sensors
 
     Pose currentPose = getCurrentPose();
@@ -114,8 +119,8 @@ void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {	//
             double objectY = (sin(alpha) * distance) + currentPose.position.y + rangeMsg.yOffsetFromCenter; // y
 
             Point32 p;
-            p.x = double(int(objectX * 1000)) / 1000; // truncate values to mm (because sonar and IR return very specific values that fall outside their precision)
-            p.y = double(int(objectY * 1000)) / 1000;
+            p.x = truncateValue(objectX); // truncate values to mm (because sonar and IR return very specific values that fall outside their precision)
+            p.y = truncateValue(objectY);
 
             pointCloud.points.push_back(p);
         }
@@ -151,9 +156,9 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
 		
 		//truncate pointcloud coordinates to mm precision.
 		for(vector<Point32>::iterator it = pointCloud.points.begin(); it != pointCloud.points.end(); it++){
-			(*it).x = floorf((*it).x *1000)/1000;
-			(*it).y = floorf((*it).y *1000)/1000;
-			(*it).z = floorf((*it).z *1000)/1000;
+			(*it).x = truncateValue((*it).x );
+			(*it).y = truncateValue((*it).y);
+			(*it).z = truncateValue((*it).z);
 		}			
 
         pointCloud.header.stamp = ros::Time::now();
