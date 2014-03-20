@@ -286,6 +286,29 @@ void publishObjects()	{
 	
 }
 
+//discard objects outside of certain range
+void forgetObjects(){
+	try{
+	Pose currentPose = getCurrentPose();
+	const double xyRange = 4.0; //TODO get actual range of the laser scanner.
+	
+	for(vector<PointCloud>::iterator objectIt = mObjects.begin(); objectIt!= mObjects.end(); ++objectIt){
+		for(vector<Point32>::iterator pointIt = (*objectIt).points.begin(); pointIt != (*objectIt).points.end(); ++pointIt){
+			double xyDistance = sqrt(pow(currentPose.position.x - (*pointIt).x,2) + (pow(currentPose.position.y - (*pointIt).y,2)));
+				if (xyDistance > xyRange){					
+					(*objectIt).points.erase( pointIt--);	//carefull here	!					
+				}
+			}
+			if((*objectIt).points.empty()){
+			mObjects.erase(objectIt--); //careful here!
+			}
+				
+		}
+	}catch(exception e){
+		ROS_ERROR("%s",e.what());
+	}
+}
+
 // receive all objects and determine if they are obstacles (on the path)
 void subObstacleDetectionCallback(const skynav_msgs::Object::ConstPtr & msg) {
     //TODO 
@@ -321,6 +344,8 @@ int main(int argc, char **argv) {
             
 		ros::spinOnce();
 		
+		//function to clean object memory
+		forgetObjects();
 		publishObjects();
 		
 		loop_rate.sleep();
