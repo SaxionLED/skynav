@@ -234,7 +234,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
                         (*firstObjectIt).points.push_back(msg->points.at(i));
                     }
 
-                    goto nextNewPoint;	
+                    goto nextNewPoint;	//point has been processed. jump to next point in pointcloud
                 }
             }
         }
@@ -304,8 +304,8 @@ void forgetObjects(){
 			}
 				
 		}
-	}catch(exception e){
-		ROS_ERROR("%s",e.what());
+	}catch(exception& e){
+		ROS_ERROR("ERROR forgetting objects: %s",e.what());
 	}
 }
 
