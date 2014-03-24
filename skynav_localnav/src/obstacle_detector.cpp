@@ -11,6 +11,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <laser_geometry/laser_geometry.h>
 #include <tf/transform_listener.h>
+#include <skynav_msgs/Objects.h>
 
 
 using namespace std;
@@ -274,16 +275,20 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 void publishObjects()	{
 	
 	ROS_INFO("%lu objects", mObjects.size());
-	
+	vector<PointCloud> obstacles;
 	vector<PointCloud>::iterator it;
+	
 	
 	for(it = mObjects.begin(); it != mObjects.end(); ++it)	{
 		
 		//(*it).header.stamp = ros::Time::now();
 		ROS_INFO("contains %lu", (*it).points.size());
 		pubObjects.publish( (*it) );
+		obstacles.push_back((*it));
 	}
-	
+	skynav_msgs::Objects msg;
+	msg.objects = obstacles;
+	pubObstacles.publish(msg);
 }
 
 //discard objects outside of certain range
@@ -325,7 +330,7 @@ int main(int argc, char **argv) {
     //pubs
     pubSensorData = n.advertise<sensor_msgs::PointCloud>("sensor_data", 1024);
     pubObjects = n.advertise<PointCloud>("objects", 1024);
-    pubObstacles = n.advertise<skynav_msgs::Object>("obstacles", 1024);
+    pubObstacles = n.advertise<skynav_msgs::Objects>("obstacles", 1024);
 
     //subs
     ros::Subscriber subSensors = n_control.subscribe("sensors", 1024, subSensorCallback); // raw unprocessed sensor values
@@ -344,8 +349,11 @@ int main(int argc, char **argv) {
             
 		ros::spinOnce();
 		
-		//function to clean object memory
+		//clean object memory
 		forgetObjects();
+		//TODO clean objects (convex hull function or similar)
+		//determineConvexHull();
+		//publish objects in range
 		publishObjects();
 		
 		loop_rate.sleep();

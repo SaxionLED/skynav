@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS message_generation std_msgs geometry_msg
 add_message_files(
   FILES
   Object.msg
+  Objects.msg
   Point32Stamped.msg
   Pose2DArray.msg
   RangeArray.msg

@@ -2,25 +2,35 @@
 #include <nav_msgs/Path.h>
 #include <skynav_msgs/waypoint_check.h>
 #include <skynav_msgs/Object.h>
+#include <skynav_msgs/Objects.h>
+#include <sensor_msgs/PointCloud.h>
+#include <geometry_msgs/Point32.h>
 #include <geometry_msgs/Point.h>
 
+
 using namespace geometry_msgs;
+using namespace sensor_msgs;
 using namespace std;
 
-vector<skynav_msgs::Object> mObstacles;
+vector<PointCloud> mObstacles;
 
-void subObstaclesCallback(const skynav_msgs::Object::ConstPtr& msg) {
-
-    //    mObstacles.push_back(msg);
+//receive a custom message, containing all up to date objects within sensor range, from obstacle detector
+void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
+	mObstacles.clear();
+	
+	for(vector<PointCloud>::const_iterator objectIt = msg->objects.begin(); objectIt!= msg->objects.end(); ++objectIt){
+        mObstacles.push_back((*objectIt));
+	}
+	ROS_INFO("nr of obstacles %d", mObstacles.size());
 }
 
 bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &response) {
 
     // take req.waypoints and check if the path intersects with obstacles, if not: return true else publish new path and return false
 
-    // obstacles consist of 2 coordinates, the line between them is the obstacle as seen by the sensors //TODO better design: maybe an array of coordinates that are near eachother, creating an ellipse? 
-
-
+	
+    // obstacles consist of 2 coordinates, the line between them is the obstacle as seen by the sensors 
+    //TODO better design. use convex hull of object (pointcloud) and determine collisison with outer lines
 
 //    Point pPath1 = req.currentPos;
 //    Point pPath2 = req.targetPos;
