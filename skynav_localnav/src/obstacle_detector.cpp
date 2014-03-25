@@ -273,7 +273,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 
 //publish all known objects
 void publishObjects()	{
-	
+		
 	ROS_INFO("%lu objects", mObjects.size());
 	vector<PointCloud> obstacles;
 	vector<PointCloud>::iterator it;
@@ -283,7 +283,7 @@ void publishObjects()	{
 		
 		//(*it).header.stamp = ros::Time::now();
 		ROS_INFO("contains %lu", (*it).points.size());
-		pubObjects.publish( (*it) );
+		//pubObjects.publish( (*it) );
 		obstacles.push_back((*it));
 	}
 	skynav_msgs::Objects msg;
