@@ -9,6 +9,8 @@ using namespace std;
 using namespace geometry_msgs;
 
 ros::Publisher pubWaypoints;
+ros::Publisher pubDummyPath;
+ros::ServiceClient servClientWaypointCheck;
 
 void subNavigationStateCallback(const std_msgs::UInt8::ConstPtr& msg) {
 
@@ -16,9 +18,20 @@ void subNavigationStateCallback(const std_msgs::UInt8::ConstPtr& msg) {
 }
 
 void subGlobalPlannerWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
-
-    //TODO use path_check in the LocalNav module
+	
 	ROS_INFO("received new path from GlobalNav");
+	//todo add current location to path check
+	for(int wp1 = 0, wp2 = 1; wp2<msg->poses.size(); ++wp1,++wp2){
+		skynav_msgs::waypoint_check srv;
+		srv.request.currentPos = msg->poses.at(wp1).pose.position;
+		srv.request.targetPos  = msg->poses.at(wp2).pose.position;
+
+		if(!servClientWaypointCheck.call(srv)){
+			 //insert_after(srv.path,waypoint1);
+			 //service to Globalnav for feedback
+			 ROS_INFO("colission detected on path from Globalnav");
+		}			 
+	}
     pubWaypoints.publish(msg);
 }
 
@@ -39,52 +52,52 @@ void placeholderGlobalPlannerWaypoints() {
     path.header.frame_id = "/map";
     path.header.stamp = ros::Time::now();
 
-    double rectSize = 1;
+    double rectSize = 10;
 
     PoseStamped ps;
     ps.header.frame_id = "/map";
     ps.header.stamp = ros::Time::now();
 
-    // start pose, has orientation (should be the same as robots physical orientation)
-    //{
-        //ps.pose.position.x = 0;
-        //ps.pose.position.y = 0;
-        //path.poses.push_back(ps);
-    //}
-
-    //{ // no orientation needed
-        //ps.pose.position.x = rectSize;
-        //ps.pose.position.y = 0;
-        //path.poses.push_back(ps);
-    //}
-
-    //{ // no orientation needed
-        //ps.pose.position.x = rectSize;
-        //ps.pose.position.y = rectSize;
-        //path.poses.push_back(ps);
-    //}
-
-    //{ // no orientation needed
-        //ps.pose.position.x = 0;
-        //ps.pose.position.y = rectSize;
-        //path.poses.push_back(ps);
-    //}
-
-    //{ // end pose, needs orientation
-        //ps.pose.position.x = 0;
-        //ps.pose.position.y = 0;
-        //ps.pose.orientation.z = M_PI;   //180 deg
-        //path.poses.push_back(ps);
-    //}
-    
-    
-    { // no orientation needed
-        ps.pose.position.x = 10;
+     //start pose, has orientation (should be the same as robots physical orientation)
+    {
+        ps.pose.position.x = 0;
         ps.pose.position.y = 0;
         path.poses.push_back(ps);
-    }   
+    }
 
-    pubWaypoints.publish(path);
+    { // no orientation needed
+        ps.pose.position.x = 0;
+        ps.pose.position.y = 0.2*rectSize;
+        path.poses.push_back(ps);
+    }
+
+    { // no orientation needed
+        ps.pose.position.x = rectSize;
+        ps.pose.position.y = 0.5*rectSize;
+        path.poses.push_back(ps);
+    }
+
+    { // no orientation needed
+        ps.pose.position.x = rectSize;
+        ps.pose.position.y = -0.5*rectSize;
+        path.poses.push_back(ps);
+    }
+    
+    { // no orientation needed
+        ps.pose.position.x = 0;
+        ps.pose.position.y = -0.5*rectSize;
+        path.poses.push_back(ps);
+    }
+
+    { // end pose, needs orientation
+        ps.pose.position.x = 0;
+        ps.pose.position.y = 0;
+        ps.pose.orientation.z = M_PI;   //180 deg
+        path.poses.push_back(ps);
+    }
+
+    //pubWaypoints.publish(path);
+    pubDummyPath.publish(path); //publish dummy path data on waypoints topic
 }
 
 int main(int argc, char **argv) {
@@ -98,26 +111,26 @@ int main(int argc, char **argv) {
     //pubs
     ros::Publisher pubNavigationState = n.advertise<std_msgs::UInt8>("navigation_state", 0);
     pubWaypoints = n.advertise<nav_msgs::Path>("checked_waypoints", 32);
-
+	pubDummyPath = n_globalnav.advertise<nav_msgs::Path>("waypoints", 32);
 
     //subs
     ros::Subscriber subNavigationState = n.subscribe("navigation_state", 0, subNavigationStateCallback);
     ros::Subscriber subGlobalPlannerWaypoints = n_globalnav.subscribe("waypoints", 32, subGlobalPlannerWaypointsCallback);
 
     //service
-    ros::ServiceClient servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
+    servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
 
-    ros::Rate loop_rate(1);
-
-// add a sleep here
-	loop_rate.sleep();
+    ros::Rate loop_rate(1);    
+    
+	while(ros::ok()){
+	//ros::Duration(10).sleep();
+      
+	//placeholderGlobalPlannerWaypoints();
 	
-    //placeholderGlobalPlannerWaypoints();
-
-    //add waypoint service to globalnav here
-
+    loop_rate.sleep();
+    
     ros::spin();
-
+	}
 
 
     return 0;
