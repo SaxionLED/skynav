@@ -61,7 +61,7 @@ PointCloud convex_hull(vector<Point32> P)
  
 	H.resize(k);
 	for(int i = 0; i<H.size(); ++i){
-	PC.points.push_back(H.at(i));	
+		PC.points.push_back(H.at(i));	
 	}
 	PC.header.stamp = ros::Time::now();
     PC.header.frame_id = "/map";
@@ -83,7 +83,7 @@ void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 	}		
 	convexhullFunction();	//TODO replace with concave hull function!?	
 
-	ROS_INFO("outlines %d", mObjectOutlines.size());
+	//ROS_INFO("outlines %d", mObjectOutlines.size());
 	
 	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
 		//ROS_INFO("size %d",(*outlineIt).points.size());
@@ -137,16 +137,17 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 				intersection.y = (A1*C2 - A2*C1)/determant;					
 				
 				//check if intersection of lines occur within obstacle boundaries;
-				if(	min(pObstacle1.x,pObstacle2.x) <= intersection.x && intersection.x <= max(pObstacle1.x,pObstacle2.x)){
-					if(min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y)){									
-						//ROS_INFO("Intersection found at (%f, %f)", intersection.x, intersection.y);
+				if(	min(pObstacle1.x,pObstacle2.x) <= intersection.x && intersection.x <= max(pObstacle1.x, pObstacle2.x) 
+				 && min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y)){	
+					//check if intersection of lines occur within path boundaries;
+					if(	min(pPath1.x,pPath2.x) <= intersection.x && intersection.x <= max(pPath1.x, pPath2.x) 
+					 && min(pPath1.y,pPath2.y) <= intersection.y && intersection.y <= max(pPath1.y, pPath2.y)){
+						//path collides with object						
 						colissionsFound = true;
 						colissions.push_back(intersection);
-						continue;	//check for further colissions
-					}
-					//ROS_INFO("intersection out of y bound");					
-				}
-				//ROS_INFO("intersection out of x bound");							
+						continue;	//check for other colission points
+					}						
+				}							
 			}
 		}
 	}
@@ -162,17 +163,15 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 				colDistance = newDist;		
 				relColission = (*colIt);
 			}
-		}
-		
-		ROS_INFO("Intersection found at (%f, %f)", relColission.x, relColission.y);
+		}		
+		ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
 		
 		//calculate new Point newPoint with recursive bug algorithm
 		//Point newPoint = recursiveBug();
 		//msg.resp.newPos = newPoint;
 		return false;
 	}	
-	//ROS_INFO("no colissions found");
-    return true;
+	return true;
 }
 
 int main(int argc, char **argv) {
