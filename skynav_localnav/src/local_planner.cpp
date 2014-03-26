@@ -17,10 +17,10 @@ ros::Publisher pubObjectOutlines;
 vector<PointCloud> mObstacles;
 vector<PointCloud> mObjectOutlines;
 
+//compare both points to each other
 bool compare(const Point32 &p, const Point32 &q){
 	return p.x < q.x || (p.x == q.x && p.y < q.y);
 }
-
 
 // 2D cross product of OA and OB vectors, i.e. z-component of their 3D cross product.
 // Returns a positive value, if OAB makes a counter-clockwise turn,
@@ -29,6 +29,9 @@ double cross(const Point32 &O, const Point32 &A, const Point32 &B)
 {
 	return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
 }
+
+//TODO Convex hull is not correct when encountering concave objects like walls!!
+//TODO function severely slows down program!!
  
 // Implementation of Andrew's monotone chain 2D convex hull algorithm.
 // Asymptotic complexity: O(n log n).
@@ -78,57 +81,99 @@ void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 	for(vector<PointCloud>::const_iterator objectIt = msg->objects.begin(); objectIt!= msg->objects.end(); ++objectIt){
         mObstacles.push_back((*objectIt));
 	}		
-	convexhullFunction();	
+	convexhullFunction();	//TODO replace with concave hull function!?	
 
 	ROS_INFO("outlines %d", mObjectOutlines.size());
 	
 	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
-		ROS_INFO("size %d",(*outlineIt).points.size());
+		//ROS_INFO("size %d",(*outlineIt).points.size());
 		pubObjectOutlines.publish((*outlineIt) );
 	}
 }
 
-bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &response) {
+bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
 
-    // take req.waypoints and check if the path intersects with obstacles, if not: return true else publish new path and return false
-
+    // receive the two coordinates that make up the current path and check for colission with known objects.
+    // if the path is free, return true , otherwise else publish a new coordinate for the path and return false
 	
-    // obstacles consist of 2 coordinates, the line between them is the obstacle as seen by the sensors 
-    //TODO better design. use convex hull of object (pointcloud) and determine collisison with outer lines
+    // obstacles consist of a set of coordinates that determine the outline of the object.
+    // the line (edge) between two consecutive coordinates can be checked for colission with the path    
+	// TODO margin, eg robot size
 
-//    Point pPath1 = req.currentPos;
-//    Point pPath2 = req.targetPos;
-//
-//    Point pathVector;
-//    pathVector.x = pPath1.x - pPath2.x;
-//    pathVector.y = pPath1.y - pPath2.y;
-//
-//    for (int i = 0; i < mObstacles.size(); i++) {
-//
-//        Point pObstacle1 = mObstacles.at(i).p1;
-//        Point pObstacle2 = mObstacles.at(i).p2;
-//
-//        // if path line collides with any obstacle line, report it //TODO margin, eg robot size
-//        
-//        Point obstacleVector;
-//        obstacleVector.x = pObstacle2.x - pObstacle1.x;
-//        obstacleVector.y = pObstacle2.y - pObstacle1.y;
-//
-//        float lengthCrossProduct = pathVector.x * obstacleVector.y - obstacleVector.x * pathVector.y;
-//        
-//        if(lengthCrossProduct != 0)     {
-//            // intersection
-//            
-//            
-//        } else {
-////            ROS_INFO("No intersection found");
-//        }
-//
-//    }
+    Point pPath1 = req.currentPos;
+    Point pPath2 = req.targetPos;
+    					
+	//line function for path Ax+By=C
+	double A1 = pPath2.y-pPath1.y;
+	double B1 = pPath1.x - pPath2.x;
+	double C1 = A1*pPath1.x+B1*pPath1.y;
+	
+	double A2;
+	double B2;
+	double C2;
+	double determant;
+	Point intersection;
+	vector<Point> colissions;
+	bool colissionsFound=false;
+	
+    for (vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt != mObjectOutlines.end(); ++outlineIt) {
+		if((*outlineIt).points.size() > 2){
+			for(int i = 0, j = 1; j<(*outlineIt).points.size(); ++i,++j){
 
+				Point32 pObstacle1 = (*outlineIt).points.at(i);
+				Point32 pObstacle2 = (*outlineIt).points.at(j);
+		
+				//line function for object edge Ax+By=C
+				A2 = pObstacle2.y - pObstacle1.y;
+				B2 = pObstacle1.x-pObstacle2.x;
+				C2 = A2*pObstacle1.x+B2*pObstacle1.y;				
+							
+				double determant = A1*B2 - A2*B1;
+				if(determant == 0){
+					//ROS_INFO("no intersections");	//Lines are parallel
+					continue;						//point has been processed. jump to next edge of the object
+				}
+				intersection.x = (B2*C1 - B1*C2)/determant;
+				intersection.y = (A1*C2 - A2*C1)/determant;					
+				
+				//check if intersection of lines occur within obstacle boundaries;
+				if(	min(pObstacle1.x,pObstacle2.x) <= intersection.x && intersection.x <= max(pObstacle1.x,pObstacle2.x)){
+					if(min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y)){									
+						//ROS_INFO("Intersection found at (%f, %f)", intersection.x, intersection.y);
+						colissionsFound = true;
+						colissions.push_back(intersection);
+						continue;	//check for further colissions
+					}
+					//ROS_INFO("intersection out of y bound");					
+				}
+				//ROS_INFO("intersection out of x bound");							
+			}
+		}
+	}
+	if(colissionsFound){
+		//find relevant colission from set of colissions with pythagoras
+		Point relColission;
+		double colDistance = 5; //TODO maximum laser range
+		double newDist;
+
+		for(vector<Point>::iterator colIt = colissions.begin(); colIt!=colissions.end(); ++colIt){
+			newDist = sqrt(pow((pPath1.x-(*colIt).x),2) + pow((pPath1.y - (*colIt).y),2));
+			if( newDist < colDistance){		
+				colDistance = newDist;		
+				relColission = (*colIt);
+			}
+		}
+		
+		ROS_INFO("Intersection found at (%f, %f)", relColission.x, relColission.y);
+		
+		//calculate new Point newPoint with recursive bug algorithm
+		//Point newPoint = recursiveBug();
+		//msg.resp.newPos = newPoint;
+		return false;
+	}	
+	//ROS_INFO("no colissions found");
     return true;
 }
-
 
 int main(int argc, char **argv) {
 
