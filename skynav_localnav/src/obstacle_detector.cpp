@@ -96,9 +96,11 @@ static bool pointInRange(const Point32* a, const Point32* b, const double search
     return false;
 }
 
-//truncate values (in meters) to mm precision
+//truncate values (in meters) to certain precision
 float truncateValue(const float value){
-	return floorf(value*1000)/1000; 
+	//return floorf(value*1000)/1000; //mm
+	return floorf(value*100)/100; //cm
+ 
 }
 
 void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {	// for x80 sonar/IR sensors
@@ -274,16 +276,16 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 //publish all known objects
 void publishObjects()	{
 		
-	ROS_INFO("%lu objects", mObjects.size());
+	ROS_INFO("%d objects", mObjects.size());
 	vector<PointCloud> obstacles;
 	vector<PointCloud>::iterator it;
-	
-	
+		
 	for(it = mObjects.begin(); it != mObjects.end(); ++it)	{
 		
 		//(*it).header.stamp = ros::Time::now();
-		ROS_INFO("contains %lu", (*it).points.size());
-		//pubObjects.publish( (*it) );
+		//ROS_INFO("contains %d", (*it).points.size());
+		pubObjects.publish( (*it) );
+		
 		obstacles.push_back((*it));
 	}
 	skynav_msgs::Objects msg;
@@ -305,7 +307,7 @@ void forgetObjects(){
 				}
 			}
 			if((*objectIt).points.empty()){
-			mObjects.erase(objectIt--); //careful here!
+				mObjects.erase(objectIt--); //careful here!
 			}
 				
 		}
