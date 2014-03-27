@@ -66,7 +66,7 @@ Pose getCurrentPose() {
 
 //determine if a point already exist in a list of points.
 static bool pointExists(const Point32* a, vector<Point32>* vec) {
-	const double xyRange = 0.005; //within 0.5 cm, it is concidered the same coordinate
+	const double xyRange = 0.02; //within 2 cm, it is concidered the same coordinate
     vector<Point32>::iterator it;
 
     for (it = vec->begin(); it != vec->end(); ++it) {
@@ -276,7 +276,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 //publish all known objects
 void publishObjects()	{
 		
-	ROS_INFO("%d objects", mObjects.size());
+	//ROS_INFO("%d objects", mObjects.size());
 	vector<PointCloud> obstacles;
 	vector<PointCloud>::iterator it;
 		

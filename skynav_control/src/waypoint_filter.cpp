@@ -18,11 +18,10 @@ void subNavigationStateCallback(const std_msgs::UInt8::ConstPtr& msg) {
 }
 
 void subGlobalPlannerWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
-	
+	skynav_msgs::waypoint_check srv;
 	ROS_INFO("received new path from GlobalNav");
-	//todo add current location to path check
+
 	for(int wp1 = 0, wp2 = 1; wp2<msg->poses.size(); ++wp1,++wp2){
-		skynav_msgs::waypoint_check srv;
 		srv.request.currentPos = msg->poses.at(wp1).pose.position;
 		srv.request.targetPos  = msg->poses.at(wp2).pose.position;
 
