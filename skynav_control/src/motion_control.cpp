@@ -10,6 +10,8 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
+#include <boost/thread/thread.hpp>
+
 
 // defines
 #define MOTION_VELOCITY                	0.2                      // speed in m/s
@@ -164,9 +166,33 @@ void motionTurn(const double theta) {
 
 }
 
+//function to run in seperate thread for continuesly checking colission
+void check_collision_thread(const Point absTarget){
+	ROS_INFO("checking for collision in thread");
+	while(1){
+		try{
+			boost::this_thread::sleep(boost::posix_time::milliseconds(500));
+			Pose currentPose = getCurrentPose(); //lock function!?			            
+			//check if the path to the next waypoint is blocked by a known object
+			skynav_msgs::waypoint_check srv;
+			srv.request.currentPos = currentPose.position;
+			srv.request.targetPos  = absTarget;
+			if(!servClientWaypointCheck.call(srv)){	  
+				  //pubNavigationStateHelper(NAV_OBSTACLE_DETECTED);
+			}
+		}
+		catch(boost::thread_interrupted&){
+			ROS_INFO("collision check thread ended");
+			return;
+		}catch(const std::exception& e){
+			ROS_ERROR("error in colissioncheck thread %s",e.what());
+		}			
+	}
+	return;	
+}
 
-bool motionForward(const Point target) {
-
+bool motionForward(const Point target, const Point absTarget) {
+	boost::thread t(&check_collision_thread, absTarget);
     if (target.x > DISTANCE_ERROR_ALLOWED) {
 		
 		 const Pose originalPose = getCurrentPose();
@@ -210,8 +236,12 @@ bool motionForward(const Point target) {
 		
 		pubNavigationStateHelper(NAV_POSE_REACHED);
 
+		t.interrupt();
+		t.join();
         return true;
     } else
+    	t.interrupt();
+		t.join();
         return false;
 }
 
@@ -284,14 +314,6 @@ void navigate() {
             }
 
             ROS_INFO("current target pose: (%f, %f)", absoluteTargetPose.pose.position.x, absoluteTargetPose.pose.position.y);
-            
-			//check if the path to the next waypoint is blocked by a known object
-			skynav_msgs::waypoint_check srv;
-			srv.request.currentPos = currentPose.position;
-			srv.request.targetPos  = absoluteTargetPose.pose.position;
-			if(!servClientWaypointCheck.call(srv)){	  
-				  //pubNavigationStateHelper(NAV_OBSTACLE_DETECTED);
-			}
 					
             double a1 = atan2(absoluteTargetPose.pose.position.y - currentPose.position.y, absoluteTargetPose.pose.position.x - currentPose.position.x); // calc turn towards next point
             double a2 = currentPose.orientation.z;
@@ -305,7 +327,7 @@ void navigate() {
 
 
 
-			if (!motionForward(relativeTargetPose.position)) { // if false, distance falls within the allowed error value, so we have reached the pose
+			if (!motionForward(relativeTargetPose.position, absoluteTargetPose.pose.position)) { // if false, distance falls within the allowed error value, so we have reached the pose
 
 				ROS_INFO("skipping distance of %fm", relativeTargetPose.position.x);
 				pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
@@ -347,10 +369,9 @@ void placeholder_ManualTargetPose() {
 
     //        vector<string> stringInput;
     //        boost::split(stringInput, userInput, boost::is_any_of(","));
-
     Pose pose;
     pose.position.x = atof(userInput.c_str());
-	motionForward(pose.position);
+	motionForward(pose.position, pose.position);
     
 
     //        ROS_INFO("please input target theta (degrees)");
