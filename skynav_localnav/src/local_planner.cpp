@@ -31,7 +31,6 @@ double cross(const Point32 &O, const Point32 &A, const Point32 &B)
 }
 
 //TODO Convex hull is not correct when encountering concave objects like walls!!
-//TODO function severely slows down program!!
  
 // Implementation of Andrew's monotone chain 2D convex hull algorithm.
 // Asymptotic complexity: O(n log n).
@@ -69,37 +68,43 @@ PointCloud convex_hull(vector<Point32> P)
 }
 //function to call convex hull determination for each object
 void convexhullFunction(){	
+	mObjectOutlines.clear();	//clear the outlines and replace with new data
+	
 	for(vector<PointCloud>::iterator it = mObstacles.begin(); it!= mObstacles.end(); ++it){
 		mObjectOutlines.push_back(convex_hull((*it).points));
+	}
+	ROS_INFO("outlines %d", mObjectOutlines.size());	
+	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
+		//ROS_INFO("outline edges: %d",(*outlineIt).points.size());
+		pubObjectOutlines.publish((*outlineIt) );
 	}	
 }
 //receive a custom message, containing all up to date objects within sensor range, from obstacle detector
 void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 	mObstacles.clear();
-	mObjectOutlines.clear();
 
 	for(vector<PointCloud>::const_iterator objectIt = msg->objects.begin(); objectIt!= msg->objects.end(); ++objectIt){
         mObstacles.push_back((*objectIt));
 	}		
-	convexhullFunction();	//TODO replace with concave hull function!?	
-
-	//ROS_INFO("outlines %d", mObjectOutlines.size());
-	
-	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
-		//ROS_INFO("size %d",(*outlineIt).points.size());
-		pubObjectOutlines.publish((*outlineIt) );
-	}
+	//convexhullFunction();	//TODO replace with concave hull function!?
 }
-
+    
+// receive the two coordinates that make up the current path and check for colission with known objects.
+// if the path is free, return true , otherwise call the recursive bug algorithm and publish a new coordinate for the path and return false
 bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
 
-    // receive the two coordinates that make up the current path and check for colission with known objects.
-    // if the path is free, return true , otherwise else publish a new coordinate for the path and return false
-	
     // obstacles consist of a set of coordinates that determine the outline of the object.
     // the line (edge) between two consecutive coordinates can be checked for colission with the path    
 	// TODO margin, eg robot size
-
+	
+	ROS_INFO("Checking for obstacle colission");
+	convexhullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?
+	
+	if(mObjectOutlines.empty()){
+		ROS_INFO("No objects to check");
+		return true;	//if there are no objects currently known, dont calculate anything and return
+	}
+	
     Point pPath1 = req.currentPos;
     Point pPath2 = req.targetPos;
     					
@@ -117,7 +122,7 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 	bool colissionsFound=false;
 	
     for (vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt != mObjectOutlines.end(); ++outlineIt) {
-		if((*outlineIt).points.size() > 2){
+		if((*outlineIt).points.size() >= 2){
 			for(int i = 0, j = 1; j<(*outlineIt).points.size(); ++i,++j){
 
 				Point32 pObstacle1 = (*outlineIt).points.at(i);
@@ -171,6 +176,7 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 		//msg.resp.newPos = newPoint;
 		return false;
 	}	
+	ROS_INFO("No colission");
 	return true;
 }
 
