@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <skynav_msgs/current_pose.h>
+#include <skynav_msgs/waypoint_check.h>
 #include <string.h>
 #include <list>
 #include <boost/algorithm/string.hpp>
@@ -36,7 +37,7 @@ using namespace std;
 ros::NodeHandle* mNode;
 ros::NodeHandle* mNodeSLAM;
 
-ros::ServiceClient servClientCurrentPose;
+ros::ServiceClient servClientCurrentPose, servClientWaypointCheck;
 ros::Publisher pubCmdVel, pubNavigationState, pubTargetPoseStamped;
 
 list<PoseStamped>* mCurrentPath = new list<PoseStamped>;
@@ -46,11 +47,6 @@ ros::Timer mCmdVelTimeout;
 uint8_t mNavigationState = NAV_READY; // initial state
 
 void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
-
-    //    for (uint i = 0; i < msg->poses.size(); i++) { //copy path, drop stamps, dont need em
-    //
-    //        mCurrentPath->push_back(msg->poses.at(i));
-    //    }
 
     mCurrentPath = new list<PoseStamped>(msg->poses.begin(), msg->poses.end());
 
@@ -288,7 +284,15 @@ void navigate() {
             }
 
             ROS_INFO("current target pose: (%f, %f)", absoluteTargetPose.pose.position.x, absoluteTargetPose.pose.position.y);
-
+            
+			//check if the path to the next waypoint is blocked by a known object
+			skynav_msgs::waypoint_check srv;
+			srv.request.currentPos = currentPose.position;
+			srv.request.targetPos  = absoluteTargetPose.pose.position;
+			if(!servClientWaypointCheck.call(srv)){	  
+				  //pubNavigationStateHelper(NAV_OBSTACLE_DETECTED);
+			}
+					
             double a1 = atan2(absoluteTargetPose.pose.position.y - currentPose.position.y, absoluteTargetPose.pose.position.x - currentPose.position.x); // calc turn towards next point
             double a2 = currentPose.orientation.z;
 
@@ -296,10 +300,6 @@ void navigate() {
 			
 			// turn to absolute theta
             motionTurn(a1);// { //if false, angle falls within the allowed error value, so now we move forward
-
-			//ROS_INFO("skipping turn of %f degrees", relativeTargetPose.orientation.z * 180 / M_PI);
-
-			//relativeTargetPose.orientation.z = 0; // theta no longer used
 
 			relativeTargetPose.position.x = sqrt(pow(absoluteTargetPose.pose.position.x - currentPose.position.x, 2) + pow(absoluteTargetPose.pose.position.y - currentPose.position.y, 2));
 
@@ -318,6 +318,7 @@ void navigate() {
         case NAV_AVOIDING: //NYI
             break;
         case NAV_OBSTACLE_DETECTED: //NYI
+			ROS_INFO("Obstacle detected");
             break;
         case NAV_CHECKING_OBSTACLE: //NYI
             break;
@@ -362,6 +363,8 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "motion_control");
 
 	ros::NodeHandle n = ros::NodeHandle("");
+    ros::NodeHandle n_localnav("/localnav");
+    
     mNode = new ros::NodeHandle("/control");
     mNodeSLAM = new ros::NodeHandle("/slam");
 
@@ -377,6 +380,7 @@ int main(int argc, char **argv) {
 
     //services
     servClientCurrentPose = mNodeSLAM->serviceClient<skynav_msgs::current_pose>("current_pose");
+    servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
 
     // hz
     ros::Rate loop_rate(10); // loop every 100ms
