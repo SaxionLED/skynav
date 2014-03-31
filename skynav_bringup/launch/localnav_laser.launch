@@ -2,7 +2,7 @@
 
     <!-- <param name="robot_description" command="$(find x80sv_description)/urdf/x80sv.xml" /> -->
 
-	<group ns="robot">
+	<group ns="x80sv">
 		<rosparam file="$(find x80sv_driver)/x80_config.yaml" command="load"/>
 		<node pkg="x80sv_driver" name="neato_laser_publisher" type="neato_laser_publisher" output="screen"/>
 		
