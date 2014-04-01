@@ -11,6 +11,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
 #include <boost/thread/thread.hpp>
+#include <boost/thread/mutex.hpp>
 
 
 // defines
@@ -47,6 +48,8 @@ double mEndOrientation = 0;
 
 ros::Timer mCmdVelTimeout;
 uint8_t mNavigationState = NAV_READY; // initial state
+
+static boost::mutex m_mutex;
 
 void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 
@@ -91,7 +94,7 @@ void cmdVelTimeoutCallback(const ros::TimerEvent&) {
 }
 
 Pose getCurrentPose() {
-
+	boost::mutex::scoped_lock lock(m_mutex);
     Pose currentPose;
 
     skynav_msgs::current_pose poseService;
@@ -168,8 +171,9 @@ void motionTurn(const double theta) {
 
 //function to run in seperate thread for continuesly checking colission
 void check_collision_thread(const Point absTarget){
-	ROS_INFO("checking for collision in thread");
-	while(1){
+	ROS_INFO("checking for collision in seperate thread");
+	bool interrupted = false;
+	while(!interrupted){
 		try{
 			boost::this_thread::sleep(boost::posix_time::milliseconds(500));
 			Pose currentPose = getCurrentPose(); //lock function!?			            
@@ -183,12 +187,11 @@ void check_collision_thread(const Point absTarget){
 		}
 		catch(boost::thread_interrupted&){
 			ROS_INFO("collision check thread ended");
-			return;
+			interrupted = true;
 		}catch(const std::exception& e){
 			ROS_ERROR("error in colissioncheck thread %s",e.what());
 		}			
 	}
-	return;	
 }
 
 bool motionForward(const Point target, const Point absTarget) {
