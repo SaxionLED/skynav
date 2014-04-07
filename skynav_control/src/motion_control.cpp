@@ -49,7 +49,7 @@ double mEndOrientation = 0;
 ros::Timer mCmdVelTimeout;
 uint8_t mNavigationState = NAV_READY; // initial state
 
-static boost::mutex m_mutex;
+boost::mutex m_mutex;
 
 void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 
@@ -94,23 +94,60 @@ void cmdVelTimeoutCallback(const ros::TimerEvent&) {
 }
 
 Pose getCurrentPose() {
-	boost::mutex::scoped_lock lock(m_mutex);
-    Pose currentPose;
+	try{
+		boost::mutex::scoped_lock lock(m_mutex);	
+		Pose currentPose;
 
-    skynav_msgs::current_pose poseService;
+		skynav_msgs::current_pose poseService;
 
-    if (servClientCurrentPose.call(poseService)) {
+		if (servClientCurrentPose.call(poseService)) {
 
-        currentPose = poseService.response.pose;
+			currentPose = poseService.response.pose;
 
-        //        ROS_INFO("Current pose (x %f) (y %f) (theta %f)", poseService.response.pose.x, poseService.response.pose.y, poseService.response.pose.theta);
-    } else {
-        ROS_ERROR("Failed to call current_pose service from motion control");
-        ros::shutdown();
-    }
-
-    return currentPose;
+		} else {
+			ROS_ERROR("Failed to call current_pose service from motion control");
+			ros::shutdown();
+		}
+		return currentPose;
+	}catch(exception& e){
+		ROS_ERROR("exception caught: %s",e.what());
+		ros::shutdown();
+	}
 }
+
+//function to run in seperate thread for continuesly checking colission
+void check_collision_thread(const Point absTarget){
+	ROS_INFO("checking for collision in seperate thread");
+	bool interrupted = false;
+	while(!interrupted){
+		try{
+			boost::this_thread::sleep(boost::posix_time::milliseconds(500));
+			Pose currentPose = getCurrentPose();
+			
+			skynav_msgs::waypoint_check srv;
+			srv.request.currentPos = currentPose.position;
+			srv.request.targetPos  = absTarget;
+			
+			//check if the path to the next waypoint is blocked by a known object
+			if(servClientWaypointCheck.call(srv)){	  
+				  //pubNavigationStateHelper(NAV_OBSTACLE_DETECTED);
+			}else{
+				ROS_ERROR("ailed to call waypoint check service from motion_control colission check thread. check if node is active?");
+			}
+		}
+		catch(boost::thread_interrupted&){
+			ROS_INFO("collision check thread interrupted");
+			interrupted = true;
+			continue;
+		}catch(const exception& e){
+			ROS_ERROR("error in colissioncheck thread %s",e.what());
+			interrupted = true;
+			continue; 
+		}			
+	}
+	ROS_INFO("collision check thread ended");
+}
+
 
 bool posesEqual(Pose currentPose, Pose targetPose) {
 
@@ -169,36 +206,13 @@ void motionTurn(const double theta) {
 
 }
 
-//function to run in seperate thread for continuesly checking colission
-void check_collision_thread(const Point absTarget){
-	ROS_INFO("checking for collision in seperate thread");
-	bool interrupted = false;
-	while(!interrupted){
-		try{
-			boost::this_thread::sleep(boost::posix_time::milliseconds(500));
-			Pose currentPose = getCurrentPose(); //lock function!?			            
-			//check if the path to the next waypoint is blocked by a known object
-			skynav_msgs::waypoint_check srv;
-			srv.request.currentPos = currentPose.position;
-			srv.request.targetPos  = absTarget;
-			if(!servClientWaypointCheck.call(srv)){	  
-				  //pubNavigationStateHelper(NAV_OBSTACLE_DETECTED);
-			}
-		}
-		catch(boost::thread_interrupted&){
-			ROS_INFO("collision check thread ended");
-			interrupted = true;
-		}catch(const std::exception& e){
-			ROS_ERROR("error in colissioncheck thread %s",e.what());
-		}			
-	}
-}
 
 bool motionForward(const Point target, const Point absTarget) {
-	boost::thread t(&check_collision_thread, absTarget);
     if (target.x > DISTANCE_ERROR_ALLOWED) {
 		
-		 const Pose originalPose = getCurrentPose();
+		boost::thread t(&check_collision_thread, absTarget);
+
+		const Pose originalPose = getCurrentPose();
 		
 		double distanceLeft = target.x;
 		double rateHz = 0.2;
@@ -215,7 +229,7 @@ bool motionForward(const Point target, const Point absTarget) {
 		
 		ros::Rate minimumSleep(1000); //1ms
 		Pose currentPose = getCurrentPose();
-		//double t;
+
 		while((target.x - sqrt(pow(currentPose.position.x - originalPose.position.x, 2) + pow(currentPose.position.y - originalPose.position.y, 2))) > 0.0775)	{	// TODO the 0.0775 should be a var and should be checked
 			currentPose = getCurrentPose();
 			minimumSleep.sleep();
@@ -239,12 +253,10 @@ bool motionForward(const Point target, const Point absTarget) {
 		
 		pubNavigationStateHelper(NAV_POSE_REACHED);
 
-		t.interrupt();
+		t.interrupt();				
 		t.join();
         return true;
     } else
-    	t.interrupt();
-		t.join();
         return false;
 }
 
@@ -255,51 +267,43 @@ void navigate() {
 
         case NAV_UNREACHABLE:
         {
-            ROS_INFO("NAV_UNREACHABLE");
-            //            ROS_INFO("Could not reach target pose (%f, %f, %f)", mTargetPose.x, mTargetPose.y, mTargetPose.theta);
-            //            clearPath();
-            //            break;    //TEMP disabled because current_pose is NYI, target based on timeout now
+            ROS_WARN("NAV_UNREACHABLE");
+			ROS_INFO("Could not reach target pose");
+			clearPath();
         }
+        break;
         case NAV_POSE_REACHED:
         {
-            ROS_INFO("NAV_POSE_REACHED");
-
+            ROS_WARN("NAV_POSE_REACHED");
             if (mCurrentPath->size() == 1) { // just finished the last waypoint, about to remove it, but take orientation first
-
                 ROS_INFO("waypoint list empty, assuming end orientation");
-
-                //motionTurn(mEndOrientation); //function is blocking when not mEndOrientation is not reached
                 
+                //motionTurn(mEndOrientation); //function is blocking when mEndOrientation is not reached
+               
                 mCurrentPath->pop_front();
-                
-                ROS_INFO("Target reached");
-                
-                pubNavigationStateHelper(NAV_READY);
+                ROS_INFO("Target reached");                
 
             } else {
-
                 // check if pose was actually reached
                 if (ROBOT_WAYPOINT_ACCURACY) {
-                    if (posesEqual(getCurrentPose(), mCurrentPath->front().pose)) { // if within error value of target
-
+					Pose currentPose = getCurrentPose();
+                    if (posesEqual(currentPose, mCurrentPath->front().pose)) { // if within error value of target
                         mCurrentPath->pop_front();
                     }
                 } else {
-                    mCurrentPath->pop_front();
-                }
-
-                pubNavigationStateHelper(NAV_READY); // go into movement case again
-                break;
-            }
-
+				    ROS_INFO("nav pose reached unchecked, continue"); 
+					mCurrentPath->pop_front();					
+					}
+            }            
+			pubNavigationStateHelper(NAV_READY);
         }
-        case NAV_READY: //since POSE_REACHED does not break, case READY itself is only used when the robot has no path yet
+        break;
+        case NAV_READY: 
         {
-
             if (mCurrentPath->size() == 0)
                 return;
 
-            ROS_INFO("NAV_READY");
+            ROS_WARN("NAV_READY");
 
             PoseStamped absoluteTargetPose = mCurrentPath->front(); // always use index 0, if target reached, delete 0 and use the new 0
             absoluteTargetPose.header.frame_id = "/map";
@@ -311,7 +315,7 @@ void navigate() {
             Pose relativeTargetPose;
 
             if (posesEqual(currentPose, absoluteTargetPose.pose)) {
-                ROS_INFO("already at targetPose, skipping");
+                ROS_INFO("already at target pose, skipping");
                 pubNavigationStateHelper(NAV_POSE_REACHED);
                 return; // need to go to the new case before going back into this case
             }
@@ -324,62 +328,48 @@ void navigate() {
             //relativeTargetPose.orientation.z = calcShortestTurn(a1, a2); // determine shortest turn (CW or CCW)
 			
 			// turn to absolute theta
-            motionTurn(a1);// { //if false, angle falls within the allowed error value, so now we move forward
-
+            motionTurn(a1);// 
+            
 			relativeTargetPose.position.x = sqrt(pow(absoluteTargetPose.pose.position.x - currentPose.position.x, 2) + pow(absoluteTargetPose.pose.position.y - currentPose.position.y, 2));
-
-
-
+			
+			//function to move relativeTargetPose.x distance in direction
 			if (!motionForward(relativeTargetPose.position, absoluteTargetPose.pose.position)) { // if false, distance falls within the allowed error value, so we have reached the pose
 
 				ROS_INFO("skipping distance of %fm", relativeTargetPose.position.x);
 				pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
 				return; // skip the timer and nav state
 			}
-            
-            
         }
-            break;
+        break;
         case NAV_AVOIDING: //NYI
-            break;
+		{	
+			ROS_WARN("NAV_AVOIDING");
+        }   
+		break;
         case NAV_OBSTACLE_DETECTED: //NYI
-			ROS_INFO("Obstacle detected");
-            break;
-        case NAV_CHECKING_OBSTACLE: //NYI
-            break;
-        case NAV_MOVING: //deprecated?
-        {
-            // do nothing
+		{	
+			ROS_WARN("NAV_OBSTACLE_DETECTED");		
         }
-            break;
+		break;
+        case NAV_CHECKING_OBSTACLE: //NYI
+        {	
+			ROS_WARN("NAV_OBSTACLE_DETECTED");
+		}
+		break;
+        case NAV_MOVING:
+        {
+            ROS_WARN("NAV_MOVING");
+        }
+		break;
         case NAV_ERROR:
         {
-
-            ROS_INFO("An error occurred while traversing the path, halting");
+			ROS_WARN("NAV_ERROR");
             clearPath();
         }
-            break;
+        break;
         default:
             ROS_ERROR("unrecognized navigation state found");
     }
-}
-
-void placeholder_ManualTargetPose() {
-
-    ROS_INFO("please input target coordinates: x");
-    string userInput;
-    cin >> userInput;
-
-    //        vector<string> stringInput;
-    //        boost::split(stringInput, userInput, boost::is_any_of(","));
-    Pose pose;
-    pose.position.x = atof(userInput.c_str());
-	motionForward(pose.position, pose.position);
-    
-
-    //        ROS_INFO("please input target theta (degrees)");
-    //        cin >> userInput;
-    //targetPose.pose.theta = 0;//M_PI / 180 * atof(userInput.c_str());
 }
 
 int main(int argc, char **argv) {
