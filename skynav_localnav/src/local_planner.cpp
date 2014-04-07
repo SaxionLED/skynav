@@ -32,6 +32,11 @@ bool compare_Point(const Point &p, const Point &q){
 }
 
 
+//calculate distance between two point with use of pythagoras
+double calcDistance(Point a, Point b){
+	return sqrt(pow((a.x -b.x),2) + pow((a.y -b.y),2));
+}
+
 // 2D cross product of OA and OB vectors, i.e. z-component of their 3D cross product.
 // Returns a positive value, if OAB makes a counter-clockwise turn,
 // negative for clockwise turn, and zero if the points are collinear.
@@ -87,7 +92,6 @@ void convexhullFunction(){
 	}
 	//ROS_INFO("outlines %d", mObjectOutlines.size());	
 	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
-		//ROS_INFO("outline edges: %d",(*outlineIt).points.size());
 		pubObjectOutlines.publish((*outlineIt) );
 	}	
 }
@@ -105,7 +109,7 @@ void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 
 //recursive bug algorithm for object avoidance
 bool recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC){
-	ROS_INFO("recursive_bug");
+	//ROS_INFO("recursive_bug");
 	
 	bool foundNew = false;
 		
@@ -116,9 +120,9 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 	Point intersection = collisionPoint;
 	Point laser_coord;
 	
-	double offsetDegree=5; //TODO use robot radius to calculate new coordinate
+	double offsetDegree=10; //TODO use robot radius to calculate new coordinate
 	double laserDist = 4;	
-	double objectDist = sqrt(pow((currentPos.x -collisionPoint.x),2) + pow((currentPos.y -collisionPoint.y),2));
+	double objectDist = calcDistance(currentPos,collisionPoint);
 	double angleTowardTarget = atan2((targetPos.y - currentPos.y),(targetPos.x - currentPos.x));
 
 	double A1,B1,C1; 	
@@ -130,11 +134,9 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 	for(int i = 0; i<=180; ++i){
 		float angle = (M_PI*i)/180;
 		intersectFound = false;
-		//ROS_INFO("stuff %f", angle);
 
 		laser_coord.x = (currentPos.x + (cos(angleTowardTarget + angle) * laserDist));
 		laser_coord.y = (currentPos.y + (sin(angleTowardTarget + angle) * laserDist));
-        //ROS_INFO("check line to (%f,%f)",laser_coord.x,laser_coord.y);
         
 		//calculate intersection point					
 		//line function for path Ax+By=C
@@ -157,7 +159,6 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 			}
 			intersection.x = (B2*C1 - B1*C2)/determant;
 			intersection.y = (A1*C2 - A2*C1)/determant;
-			//ROS_INFO("intersect at (%f, %f)", intersection.x, intersection.y);
 			
 			//check if intersection of lines occur within obstacle boundaries;
 			if(	min(pObstacle1.x,pObstacle2.x) <= intersection.x && intersection.x <= max(pObstacle1.x, pObstacle2.x) 
@@ -173,7 +174,7 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 		}
 		
 		if (!intersectFound){
-			ROS_INFO("left  extreme at (%f, %f)", obstacleExtremeLeft.x, obstacleExtremeLeft.y);
+			//ROS_INFO("left  extreme at (%f, %f)", obstacleExtremeLeft.x, obstacleExtremeLeft.y);
 			break; // stop at first empty, previous hit was the extreme
 		}	
 		obstacleExtremeLeft = intersection;
@@ -184,11 +185,9 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 	for(int i = 0; i<=180; ++i){
 		float angle = (M_PI*i)/180;
 		intersectFound = false;
-		//ROS_INFO("stuff %f", angle);
 
 		laser_coord.x = (currentPos.x + (cos(angleTowardTarget - angle) * laserDist));
 		laser_coord.y = (currentPos.y + (sin(angleTowardTarget - angle) * laserDist));
-        //ROS_INFO("check line to (%f,%f)",laser_coord.x,laser_coord.y);
         
 		//calculate intersection point					
 		//line function for path Ax+By=C
@@ -211,7 +210,6 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 			}
 			intersection.x = (B2*C1 - B1*C2)/determant;
 			intersection.y = (A1*C2 - A2*C1)/determant;
-			//ROS_INFO("intersect at (%f, %f)", intersection.x, intersection.y);
 			
 			//check if intersection of lines occur within obstacle boundaries;
 			if(	min(pObstacle1.x,pObstacle2.x) <= intersection.x && intersection.x <= max(pObstacle1.x, pObstacle2.x) 
@@ -227,38 +225,50 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 		}
 		
 		if (!intersectFound){
-			ROS_INFO("right  extreme at (%f, %f)", obstacleExtremeRight.x, obstacleExtremeRight.y);
+			//ROS_INFO("right  extreme at (%f, %f)", obstacleExtremeRight.x, obstacleExtremeRight.y);
 			break; // stop at first empty, previous hit was the extreme
 		}	
-		obstacleExtremeRight = intersection;
-		
+		obstacleExtremeRight = intersection;		
+	}
+	
+	//check for errors with calculated extremes //TODO more checks
+	if(compare_Point(obstacleExtremeLeft,collisionPoint) && compare_Point(obstacleExtremeRight,collisionPoint)){
+		//ROS_ERROR("no extremes found besides collisionpoint itself");
+		return false;
+	}
+	
+	//calc left extreme dist;   
+    double extremeLeftPathLength  = calcDistance(targetPos, obstacleExtremeLeft);
+	//calc right extreme dist    
+	double extremeRightPathLength = calcDistance(targetPos, obstacleExtremeRight);
+	
+	//determine extreme closest to target, 
+	if (extremeLeftPathLength < extremeRightPathLength){
+		shortestExtremeToTarget=obstacleExtremeLeft;
+	}else{
+		shortestExtremeToTarget = obstacleExtremeRight;
+		//apply offset sign
+        offsetDegree = offsetDegree * -1; //inverse the offset degree
 	}
 
-	
-	//if((compare_Point(obstacleExtremeLeft,collisionPoint) && compare_Point(obstacleExtremeRight,collisionPoint)){
-		//ROS_ERROR("no extremes found besides colissionpoint itself");
-		//return false;
-	//}
-	
-	//calc left extreme dist;
-	//calc right extreme dist;
-	//determine extreme closest to target, 
-	//apply offset sign 
 	//calc new target	
-			
-	//if(foundNew){
-		//mNewWaypoint = nwTarget;
-		return true;
-	//}else{
-		//return false;
-	//}
+	double angleTowardShortestExtreme = atan2((shortestExtremeToTarget.y - currentPos.y), (shortestExtremeToTarget.x - currentPos.x));
+	nwTarget.x = 	currentPos.x + cos(angleTowardShortestExtreme + (offsetDegree * M_PI / 180)) * calcDistance(currentPos,shortestExtremeToTarget);
+	nwTarget.y =	currentPos.y + sin(angleTowardShortestExtreme + (offsetDegree * M_PI / 180)) * calcDistance(currentPos, shortestExtremeToTarget);
+	
+	//TODO check nwTarget for errors
+	
+	mNewWaypoint = nwTarget;
+	return true;
+
 }
     
     
 // receive the two coordinates that make up the current path and check for colission with known objects.
 // objects consist of a set of coordinates that determine the CONVEX outline of the object.
 // the line (edge) between two consecutive coordinates can be checked for colission with the path  
-// if the path is free, return true , otherwise call the recursive bug algorithm and publish a new coordinate for the path and return false 	// TODO margin, eg robot size
+// if the path is free, set pathChanged on true and return, otherwise call the recursive bug algorithm 
+// and return a new coordinate for the reroute and and return true 	// TODO margin, eg robot size
 bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
 
 	convexhullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?
@@ -329,22 +339,28 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 		double newDist;
 
 		for(int i =0; i<colissions.size(); ++i){
-			newDist = sqrt(pow((pPath1.x - (colissions[i].x)),2) + pow((pPath1.y - colissions[i].y),2));
+			newDist = calcDistance(pPath1,colissions.at(i));
 			if( newDist < colDistance){		
 				colDistance = newDist;		
 				relColission = colissions.at(i);
 				relObject = intersect_obstacles.at(i);
 			}
 		}		
-		ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
+		//ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
 		
 		//calculate new Point newPoint with recursive bug algorithm
-		recursiveBug(pPath1,pPath2,relColission, relObject);
-		//resp.newPos = mNewWaypoint;
-		return false;
-		//}
+		if(recursiveBug(pPath1,pPath2,relColission, relObject)){
+			resp.pathChanged = 1;
+			ROS_INFO("New waypoint at(%f,%f)",mNewWaypoint.x, mNewWaypoint.y);
+			resp.newPos = mNewWaypoint;
+			return true;
+		}			
+		resp.pathChanged = 0;
+		ROS_ERROR("Collision detected, but no new waypoint could be calculated");
+		return true;
 	}	
 	//ROS_INFO("No colission");
+	resp.pathChanged = 0;
 	return true;
 }
 
