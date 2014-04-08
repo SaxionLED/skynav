@@ -99,8 +99,7 @@ static bool pointInRange(const Point32* a, const Point32* b, const double search
 //truncate values (in meters) to certain precision
 float truncateValue(const float value){
 	//return floorf(value*1000)/1000; //mm
-	return floorf(value*100)/100; //cm
- 
+	return floorf(value*100)/100; //cm 
 }
 
 void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {	// for x80 sonar/IR sensors
