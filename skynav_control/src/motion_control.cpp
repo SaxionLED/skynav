@@ -23,14 +23,23 @@
 #define ROBOT_WAYPOINT_ACCURACY         false                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
 
 enum NAVIGATION_STATE { //TODO move this into a shared container (skynav_msgs perhaps?)
-    NAV_READY = 0,
-    NAV_MOVING = 1,
-    NAV_AVOIDING = 2,
-    NAV_POSE_REACHED = 3,
-    NAV_ERROR = 4,
-    NAV_UNREACHABLE = 5,
-    NAV_OBSTACLE_DETECTED = 6,
-    NAV_CHECKING_OBSTACLE = 7
+    NAV_READY = 0,					//check for new path recieved
+    NAV_MOVING = 1,					//calculate path to next waypoint, turn, accel, drive and decel.
+    NAV_AVOIDING = 2,				//reroute past detected object
+    NAV_POSE_REACHED = 3,			//(intermediate) waypoint has been reached, check
+    NAV_ERROR = 4,					
+    NAV_UNREACHABLE = 5,			
+    NAV_OBSTACLE_DETECTED = 6,		//obstacle has been detected
+    NAV_CHECKING_OBSTACLE = 7		//Depricated?!
+};
+
+enum MOVEMENT_STATE{
+	MOV_READY = 0,					//calculate path to next waypoint
+	MOV_TURN = 1,					//turn appropriate angle
+	MOV_ACCEL = 2,					//accelerate to certain velocity
+	MOV_STEADY = 3,					//drive steady at certain velocity
+	MOV_DECEL = 4,					//decelerate until full stop
+	MOV_REACHED = 5					//done with moving
 };
 
 using namespace geometry_msgs;
@@ -47,9 +56,10 @@ list<PoseStamped>* mCurrentPath = new list<PoseStamped>;
 double mEndOrientation = 0;
 
 ros::Timer mCmdVelTimeout;
-uint8_t mNavigationState = NAV_READY; // initial state
+uint8_t mNavigationState = NAV_READY; 	// initial navigation_state
+uint8_t mMovementState = MOV_READY;		// initial movement_state
 
-boost::mutex m_mutex;
+//boost::mutex m_mutex;
 
 void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 
@@ -77,9 +87,21 @@ void pubNavigationStateHelper(NAVIGATION_STATE state) {
     //ROS_INFO("nav state changed to %u", state);
 }
 
+void setMovementState(MOVEMENT_STATE moveState) {
+
+    // set the local state to ensure there is no delay
+    mMovementState = moveState;
+    //ROS_INFO("mov_state changed to %u", moveState);
+}
+
 void clearPath() {
 
     mCurrentPath->clear(); // clear the path
+}
+
+//calculate distance between two point with use of pythagoras
+double calcDistance(Point a, Point b){
+	return sqrt(pow((a.x - b.x),2) + pow((a.y - b.y),2));
 }
 
 void cmdVelTimeoutCallback(const ros::TimerEvent&) {
@@ -95,7 +117,7 @@ void cmdVelTimeoutCallback(const ros::TimerEvent&) {
 
 Pose getCurrentPose() {
 	try{
-		boost::mutex::scoped_lock lock(m_mutex);	
+		//boost::mutex::scoped_lock lock(m_mutex);	
 		Pose currentPose;
 
 		skynav_msgs::current_pose poseService;
@@ -115,6 +137,7 @@ Pose getCurrentPose() {
 	}
 }
 
+//semi depricated. should run in other (its own?) ros_node.
 //function to run in seperate thread for continuesly checking colission
 void check_collision_thread(const Point absTarget){
 	ROS_INFO("checking for collision in seperate thread");
@@ -151,10 +174,9 @@ void check_collision_thread(const Point absTarget){
 
 bool posesEqual(Pose currentPose, Pose targetPose) {
 
-    if (sqrt(pow(targetPose.position.x - currentPose.position.x, 2) + pow(targetPose.position.y - currentPose.position.y, 2)) < DISTANCE_ERROR_ALLOWED) {
+    if (calcDistance(targetPose.position,currentPose.position)< DISTANCE_ERROR_ALLOWED) {
         return true;
     }
-
     return false;
 }
 
@@ -178,7 +200,7 @@ void publishCmdVel(Twist twist, double t)	{
 	mCmdVelTimeout = mNode->createTimer(ros::Duration(t), cmdVelTimeoutCallback); //TODO timer value
 }
 
-
+//semi depricated function as this is integrated into nav_moving state
 void motionTurn(const double theta) {	
 	
 	ros::Rate minimumSleep(1000); //1ms
@@ -206,11 +228,11 @@ void motionTurn(const double theta) {
 
 }
 
-
+//depricated function as this is integrated into nav_moving state
 bool motionForward(const Point target, const Point absTarget) {
     if (target.x > DISTANCE_ERROR_ALLOWED) {
 		
-		boost::thread t(&check_collision_thread, absTarget);
+		//boost::thread t(&check_collision_thread, absTarget);
 
 		const Pose originalPose = getCurrentPose();
 		
@@ -234,7 +256,7 @@ bool motionForward(const Point target, const Point absTarget) {
 			currentPose = getCurrentPose();
 			minimumSleep.sleep();
 		}
-		rate.sleep();	// HACK: otherwise it wont reach target, i guess inertia etc
+		rate.sleep();	// HACK: otherwise it wont reach target, could be because of inertia
 		
 		for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
 			
@@ -253,8 +275,8 @@ bool motionForward(const Point target, const Point absTarget) {
 		
 		pubNavigationStateHelper(NAV_POSE_REACHED);
 
-		t.interrupt();				
-		t.join();
+		//t.interrupt();				
+		//t.join();
         return true;
     } else
         return false;
@@ -298,49 +320,167 @@ void navigate() {
 			pubNavigationStateHelper(NAV_READY);
         }
         break;
-        case NAV_READY: 
-        {
-            if (mCurrentPath->size() == 0)
-                return;
+        case NAV_READY: 	//IDLE state if there is no path currently available
+        {						
+			//ROS_WARN("NAV_READY");	
+            if (!mCurrentPath->size() == 0){ 
+				ROS_WARN("NAV_READY");
+				
+				PoseStamped absoluteTargetPose = mCurrentPath->front(); // always use index 0, if target reached, delete 0 and use the new 0
+				absoluteTargetPose.header.frame_id = "/map";
+				absoluteTargetPose.header.stamp = ros::Time::now();
 
-            ROS_WARN("NAV_READY");
+				pubTargetPoseStamped.publish(absoluteTargetPose);          
+				ROS_INFO("target pose: (%f, %f)", absoluteTargetPose.pose.position.x, absoluteTargetPose.pose.position.y);
 
-            PoseStamped absoluteTargetPose = mCurrentPath->front(); // always use index 0, if target reached, delete 0 and use the new 0
-            absoluteTargetPose.header.frame_id = "/map";
-            absoluteTargetPose.header.stamp = ros::Time::now();
-
-            pubTargetPoseStamped.publish(absoluteTargetPose);
-
-            Pose currentPose = getCurrentPose();
-            Pose relativeTargetPose;
-
-            if (posesEqual(currentPose, absoluteTargetPose.pose)) {
-                ROS_INFO("already at target pose, skipping");
-                pubNavigationStateHelper(NAV_POSE_REACHED);
-                return; // need to go to the new case before going back into this case
-            }
-
-            ROS_INFO("current target pose: (%f, %f)", absoluteTargetPose.pose.position.x, absoluteTargetPose.pose.position.y);
-					
-            double a1 = atan2(absoluteTargetPose.pose.position.y - currentPose.position.y, absoluteTargetPose.pose.position.x - currentPose.position.x); // calc turn towards next point
-            double a2 = currentPose.orientation.z;
-
-            //relativeTargetPose.orientation.z = calcShortestTurn(a1, a2); // determine shortest turn (CW or CCW)
-			
-			// turn to absolute theta
-            motionTurn(a1);// 
-            
-			relativeTargetPose.position.x = sqrt(pow(absoluteTargetPose.pose.position.x - currentPose.position.x, 2) + pow(absoluteTargetPose.pose.position.y - currentPose.position.y, 2));
-			
-			//function to move relativeTargetPose.x distance in direction
-			if (!motionForward(relativeTargetPose.position, absoluteTargetPose.pose.position)) { // if false, distance falls within the allowed error value, so we have reached the pose
-
-				ROS_INFO("skipping distance of %fm", relativeTargetPose.position.x);
-				pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
-				return; // skip the timer and nav state
+				pubNavigationStateHelper(NAV_MOVING);
+			}else{
+				//IDLE
+				 return; 
 			}
         }
-        break;
+		break;
+		case NAV_MOVING:
+        {
+			ROS_WARN("NAV_MOVING");
+			ros::Rate minimumSleep(1000); 	//1ms
+			double rateHz = 0.2;
+			ros::Rate rate(1 / rateHz);
+			
+			Pose currentPose;			
+			Pose originalPose;				
+			PoseStamped absoluteTargetPose;
+			Pose relativeTargetPose;
+			
+			double theta;					//relative angle to target
+			float breakDist = 0.0775;		//distance for robot to decel TODO
+			
+			Twist twist_stop;
+			
+			bool interrupted = false;
+			bool in_motion = false;
+			setMovementState(MOV_READY);
+			
+			while(!interrupted){			//while(mNavigationState == NAV_MOVING){
+				currentPose = getCurrentPose();
+				
+				switch(mMovementState){
+					case MOV_READY:
+					{
+						//retrieve abs_target pose
+						absoluteTargetPose = mCurrentPath->front(); // always use index 0, if target reached, delete 0 and use the new 0
+						//retrieve current pose
+						originalPose = currentPose;  
+						
+						if (posesEqual(currentPose, absoluteTargetPose.pose)) {
+							ROS_INFO("already at target pose, skipping");
+							pubNavigationStateHelper(NAV_POSE_REACHED);
+							return; // need to go to the new case before going back into this case
+						}
+						
+						theta =  atan2(absoluteTargetPose.pose.position.y - currentPose.position.y, absoluteTargetPose.pose.position.x - currentPose.position.x); // calc turn towards next point
+			
+						setMovementState(MOV_TURN);			
+					}
+					break;
+					case MOV_TURN:
+					{
+						if(!in_motion){
+							ROS_INFO("mov_turn");
+							Twist twist;
+							if(fmod(currentPose.orientation.z - theta + (M_PI*2), M_PI*2) <= M_PI)	{
+								twist.angular.z = -TURN_VELOCITY;
+							} else {
+								twist.angular.z = TURN_VELOCITY;
+							}
+							pubCmdVel.publish(twist);
+							in_motion = true;
+						}						
+						
+						if(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
+							//do nothing, continue turning
+						}else{						
+							pubCmdVel.publish(twist_stop); //stop movement
+							in_motion = false;
+							setMovementState(MOV_ACCEL);
+						}
+					}
+					break;
+					case MOV_ACCEL:
+					{
+						ROS_INFO("mov_accel");
+
+						//relative target pose is a point on the relative x-axle of the robot.
+						relativeTargetPose.position.x = calcDistance(absoluteTargetPose.pose.position, currentPose.position);
+						relativeTargetPose.position.y = 0;				
+						
+						if (relativeTargetPose.position.x <= DISTANCE_ERROR_ALLOWED){
+							ROS_WARN("target lies within treshold distance, skipping %fm",relativeTargetPose.position.x);
+							setMovementState(MOV_REACHED);
+							break;
+						}
+						in_motion = true;							
+
+						Twist twist;
+											
+						for(double s = MOTION_VELOCITY / 16; s <= MOTION_VELOCITY; s *= 2)	{	// total distance travelled during this phase should be 0.0775 meter
+							
+							twist.linear.x = s;
+							pubCmdVel.publish(twist);
+							
+							rate.sleep();
+						}
+						in_motion = false;
+						setMovementState(MOV_STEADY);
+					}
+					break;
+					case MOV_STEADY:
+					{
+						if(!in_motion){
+							ROS_INFO("mov_steady");
+							in_motion = true;
+						}
+						double dist_traversed = relativeTargetPose.position.x - (calcDistance(currentPose.position,originalPose.position));
+						if(dist_traversed > breakDist){
+						//do nothing, continue moving	
+						}else{
+							setMovementState(MOV_DECEL);
+							in_motion = false;
+							rate.sleep();	// HACK: otherwise it wont reach target, could be because of inertia
+						}	
+					}
+					break;
+					case MOV_DECEL:
+					{
+						ROS_INFO("mov_decel");
+						Twist twist;
+						for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
+			
+							twist.linear.x = s;							
+							pubCmdVel.publish(twist);
+							
+							rate.sleep();
+						}						
+						pubCmdVel.publish(twist_stop);
+						in_motion = false;
+						setMovementState(MOV_REACHED);	
+					}
+					break;
+					case MOV_REACHED:
+					{
+						ROS_INFO("mov_reached");
+						pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
+						interrupted = true;
+					}
+					break;		
+					default:
+						ROS_ERROR("unrecognized movement state found");
+						return;		
+				}
+				minimumSleep.sleep();
+			}
+		}
+		break;
         case NAV_AVOIDING: //NYI
 		{	
 			ROS_WARN("NAV_AVOIDING");
@@ -355,11 +495,6 @@ void navigate() {
         {	
 			ROS_WARN("NAV_OBSTACLE_DETECTED");
 		}
-		break;
-        case NAV_MOVING:
-        {
-            ROS_WARN("NAV_MOVING");
-        }
 		break;
         case NAV_ERROR:
         {
