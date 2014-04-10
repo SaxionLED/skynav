@@ -1,6 +1,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Pose.h>
 #include <skynav_msgs/current_pose.h>
+#include <skynav_msgs/current_velocity.h>
 #include <tf/transform_broadcaster.h>
 #include <tf/transform_listener.h>
 #include <nav_msgs/Path.h>
@@ -12,7 +13,7 @@ using namespace geometry_msgs;
 
 bool mFirstDataSkipped = false; // this is because ROS or the X80 (not known which) will often report a change of large degrees that are not correct. This will filter it out
 
-ros::ServiceServer servServerCurrentPose;
+ros::ServiceServer servServerCurrentPose, servServerCurrentVelocity;
 ros::Publisher pubTraversedPath;
 
 Pose mCurrentPose;
@@ -55,6 +56,26 @@ bool servServerCurrentPoseCallback(skynav_msgs::current_pose::Request &request, 
     //ROS_INFO("current tf pose: %f, %f, %f", response.pose.position.x, response.pose.position.y, response.pose.orientation.z * (180 / M_PI));    
 
     return true;
+}
+
+bool servServerCurrentVelocityCallback(skynav_msgs::current_velocity::Request &request, skynav_msgs::current_velocity::Response &response){
+	
+	//using TF to get the current speed of the reference frame to the global frame (/map)
+	
+	Twist tw;
+	
+	try{
+		mTransformListener->lookupTwist("/base_link", "/map", ros::Time(0), ros::Duration(1), tw);
+	}catch (tf::TransformException ex){
+		ROS_ERROR("%s", ex.what());
+		return false;
+	}
+	
+	response.velocity = tw;
+	
+	//ROS_INFO("current velocity: %f",response.velocity.linear.x);
+	
+	return true;
 }
 
 void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg) {		// this is currently only called by the actual robot, not simulator
@@ -148,6 +169,8 @@ int main(int argc, char **argv) {
 
     //services
     servServerCurrentPose = n.advertiseService("current_pose", servServerCurrentPoseCallback);
+    servServerCurrentVelocity = n.advertiseService("current_velocity", servServerCurrentVelocityCallback);
+
 
     ros::Rate loop_rate(10);    //10hz
     

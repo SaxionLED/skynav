@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <skynav_msgs/current_pose.h>
+#include <skynav_msgs/current_velocity.h>
 #include <skynav_msgs/waypoint_check.h>
 #include <string.h>
 #include <list>
@@ -49,7 +50,7 @@ using namespace std;
 ros::NodeHandle* mNode;
 ros::NodeHandle* mNodeSLAM;
 
-ros::ServiceClient servClientCurrentPose, servClientWaypointCheck;
+ros::ServiceClient servClientCurrentPose, servClientWaypointCheck, servClientCurrentVelocity;
 ros::Publisher pubCmdVel, pubNavigationState, pubTargetPoseStamped;
 
 list<PoseStamped>* mCurrentPath = new list<PoseStamped>;
@@ -131,6 +132,28 @@ Pose getCurrentPose() {
 			ros::shutdown();
 		}
 		return currentPose;
+	}catch(exception& e){
+		ROS_ERROR("exception caught: %s",e.what());
+		ros::shutdown();
+	}
+}
+
+Twist getCurrentVelocity() {
+	try{
+		//boost::mutex::scoped_lock lock(m_mutex);	
+		Twist currentVelocity;
+
+		skynav_msgs::current_velocity velService;
+
+		if (servClientCurrentVelocity.call(velService)) {
+
+			currentVelocity = velService.response.velocity;
+
+		} else {
+			ROS_ERROR("Failed to call current_velocity service from motion control");
+			ros::shutdown();
+		}
+		return currentVelocity;
 	}catch(exception& e){
 		ROS_ERROR("exception caught: %s",e.what());
 		ros::shutdown();
@@ -442,7 +465,8 @@ void navigate() {
 						}
 						double dist_traversed = relativeTargetPose.position.x - (calcDistance(currentPose.position,originalPose.position));
 						if(dist_traversed > breakDist){
-						//do nothing, continue moving	
+							getCurrentVelocity();
+							//do nothing, continue moving	
 						}else{
 							setMovementState(MOV_DECEL);
 							in_motion = false;
@@ -529,6 +553,7 @@ int main(int argc, char **argv) {
 
     //services
     servClientCurrentPose = mNodeSLAM->serviceClient<skynav_msgs::current_pose>("current_pose");
+    servClientCurrentVelocity = mNodeSLAM->serviceClient<skynav_msgs::current_velocity>("current_velocity");
     servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
 
     // hz
