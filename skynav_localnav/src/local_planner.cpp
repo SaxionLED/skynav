@@ -7,18 +7,26 @@
 #include <sensor_msgs/PointCloud.h>
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/Point.h>
+#include <std_msgs/UInt8.h>
+#include <geometry_msgs/PoseStamped.h>
 
 
 using namespace geometry_msgs;
 using namespace sensor_msgs;
 using namespace std;
 
-ros::Publisher pubObjectOutlines;
+ros::Publisher pubObjectOutlines, pubWaypoints;
+ros::Subscriber subObstacles, subNavigationState, subAbsoluteTargetPose;
+ros::ServiceServer servServerWaypointCheck;
 
 vector<PointCloud> mObstacles;
 vector<PointCloud> mObjectOutlines;
 
-Point mNewWaypoint;			//new waypoint calculated by recursiveBug
+Point mNewWaypoint;							//new waypoint calculated by recursiveBug
+
+PoseStamped mCurrentAbsoluteTargetPose;		//the current next target pose, as published by motion_control
+uint8_t mControl_NavigationState;			// the state which motion_control is in.
+
 
 //compare function for sorting algorithm
 bool compare(const Point32 &p, const Point32 &q){
@@ -49,8 +57,7 @@ float truncateValue(const float value){
 // 2D cross product of OA and OB vectors, i.e. z-component of their 3D cross product.
 // Returns a positive value, if OAB makes a counter-clockwise turn,
 // negative for clockwise turn, and zero if the points are collinear.
-double cross(const Point32 &O, const Point32 &A, const Point32 &B)
-{
+double cross(const Point32 &O, const Point32 &A, const Point32 &B){
 	return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
 }
 
@@ -60,8 +67,7 @@ double cross(const Point32 &O, const Point32 &A, const Point32 &B)
 // Asymptotic complexity: O(n log n).
 // Returns a pointcloud containing a list of points on the convex hull in counter-clockwise order.
 // Note: the last point in the returned list is the same as the first one.
-PointCloud convex_hull(vector<Point32> P)
-{
+PointCloud convex_hull(vector<Point32> P){
 	PointCloud PC;
 	
 	int n = P.size(), k = 0;
@@ -105,6 +111,16 @@ void convexhullFunction(){
 	}	
 }
 
+
+void subNavigationStateCallback(const std_msgs::UInt8& msg ){
+	mControl_NavigationState = msg.data;
+	//ROS_INFO("Current NavigationState: %d", msg.data);	
+}
+
+void subAbsoluteTargetPoseCallback(const PoseStamped& msg){
+	mCurrentAbsoluteTargetPose = msg;
+	//ROS_INFO("Current target pose: (%f,%f)", msg.pose.position.x, msg.pose.position.y);
+}
 
 //receive a custom message, containing all up to date objects within sensor range, from obstacle detector
 void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
@@ -358,8 +374,9 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 		//calculate new Point newPoint with recursive bug algorithm
 		if(recursiveBug(pPath1,pPath2,relColission, relObject)){
 			resp.pathChanged = 1;
-			ROS_INFO("New waypoint at(%f,%f)",mNewWaypoint.x, mNewWaypoint.y);
 			resp.newPos = mNewWaypoint;
+			//ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
+			ROS_INFO("New waypoint at(%f,%f)",mNewWaypoint.x, mNewWaypoint.y);
 			return true;
 		}			
 		resp.pathChanged = 0;
@@ -379,14 +396,17 @@ int main(int argc, char **argv) {
     ros::NodeHandle n_control("/control");
 
     //pubs
-    ros::Publisher pubWaypoints = n_control.advertise<nav_msgs::Path>("checked_waypoints", 32);
-    pubObjectOutlines = n.advertise<PointCloud>("objectOutlines", 1024);
+    pubWaypoints = n_control.advertise<nav_msgs::Path>("checked_waypoints", 32);
+    pubObjectOutlines = n.advertise<PointCloud>("objectOutlines", 10);
 
     //subs
-    ros::Subscriber subObstacles = n.subscribe("obstacles", 1024, subObstaclesCallback);
-
+    subObstacles = n.subscribe("obstacles", 1024, subObstaclesCallback);
+	subNavigationState= n_control.subscribe("navigation_state",0,subNavigationStateCallback);
+	subAbsoluteTargetPose = n_control.subscribe("target_pose",4,subAbsoluteTargetPoseCallback);
+	
+	
     //services
-    ros::ServiceServer servServerWaypointCheck = n.advertiseService("path_check", servServerWaypointCheckCallback);
+    servServerWaypointCheck = n.advertiseService("path_check", servServerWaypointCheckCallback);
 
     ros::spin();
 
