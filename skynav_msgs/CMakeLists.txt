@@ -23,6 +23,7 @@ add_message_files(
 add_service_files(
   FILES
   current_pose.srv
+  current_velocity.srv
   edit_fixedWPs_srv.srv
   mapreader_srv.srv
   path_query_srv.srv
