@@ -60,8 +60,6 @@ ros::Timer mCmdVelTimeout;
 uint8_t mNavigationState = NAV_READY; 	// initial navigation_state
 uint8_t mMovementState = MOV_READY;		// initial movement_state
 
-//boost::mutex m_mutex;
-
 void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 
     mCurrentPath = new list<PoseStamped>(msg->poses.begin(), msg->poses.end());
@@ -118,7 +116,6 @@ void cmdVelTimeoutCallback(const ros::TimerEvent&) {
 
 Pose getCurrentPose() {
 	try{
-		//boost::mutex::scoped_lock lock(m_mutex);	
 		Pose currentPose;
 
 		skynav_msgs::current_pose poseService;
@@ -140,7 +137,6 @@ Pose getCurrentPose() {
 
 Twist getCurrentVelocity() {
 	try{
-		//boost::mutex::scoped_lock lock(m_mutex);	
 		Twist currentVelocity;
 
 		skynav_msgs::current_velocity velService;
@@ -175,10 +171,12 @@ void check_collision_thread(const Point absTarget){
 			srv.request.targetPos  = absTarget;
 			
 			//check if the path to the next waypoint is blocked by a known object
-			if(servClientWaypointCheck.call(srv)){	  
-				  //pubNavigationStateHelper(NAV_OBSTACLE_DETECTED);
+			if(servClientWaypointCheck.call(srv)){
+				if(srv.response.pathChanged && mMovementState!=MOV_TURN){						  
+				  pubNavigationStateHelper(NAV_OBSTACLE_DETECTED);
+				}
 			}else{
-				ROS_ERROR("ailed to call waypoint check service from motion_control colission check thread. check if node is active?");
+				ROS_ERROR("failed to call waypoint check service from motion_control colission check thread. check if node is active?");
 			}
 		}
 		catch(boost::thread_interrupted&){
@@ -364,7 +362,7 @@ void navigate() {
         }
 		break;
 		case NAV_MOVING:
-        {
+        {			
 			ROS_WARN("NAV_MOVING");
 			ros::Rate minimumSleep(1000); 	//1ms
 			double rateHz = 0.2;
@@ -380,11 +378,10 @@ void navigate() {
 			
 			Twist twist_stop;
 			
-			bool interrupted = false;
 			bool in_motion = false;
 			setMovementState(MOV_READY);
 			
-			while(!interrupted){			//while(mNavigationState == NAV_MOVING){
+			while(mNavigationState == NAV_MOVING){ 		//while(!interrupted){
 				currentPose = getCurrentPose();
 				
 				switch(mMovementState){
@@ -398,9 +395,9 @@ void navigate() {
 						if (posesEqual(currentPose, absoluteTargetPose.pose)) {
 							ROS_INFO("already at target pose, skipping");
 							pubNavigationStateHelper(NAV_POSE_REACHED);
-							return; // need to go to the new case before going back into this case
+							break; // need to go to the new case before going back into this case
 						}
-						
+
 						theta =  atan2(absoluteTargetPose.pose.position.y - currentPose.position.y, absoluteTargetPose.pose.position.x - currentPose.position.x); // calc turn towards next point
 			
 						setMovementState(MOV_TURN);			
@@ -494,28 +491,49 @@ void navigate() {
 					{
 						ROS_INFO("mov_reached");
 						pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
-						interrupted = true;
 					}
 					break;		
 					default:
+					{
 						ROS_ERROR("unrecognized movement state found");
-						return;		
+						
+					break;
+					}		
 				}
 				minimumSleep.sleep();
-			}
+			}		
 		}
 		break;
         case NAV_AVOIDING: //NYI
 		{	
 			ROS_WARN("NAV_AVOIDING");
+			ros::Duration(2).sleep();
+			pubNavigationStateHelper(NAV_READY);
         }   
 		break;
         case NAV_OBSTACLE_DETECTED: //NYI
 		{	
-			ROS_WARN("NAV_OBSTACLE_DETECTED");		
+			ROS_WARN("NAV_OBSTACLE_DETECTED");	
+			Twist twist_stop;	
+			Twist curVel = getCurrentVelocity();
+			if(abs(curVel.linear.x) > 0.05){
+				ROS_INFO("current velocity is: %f ,breaking", curVel.linear.x);
+				double rateHz = 0.2;
+				ros::Rate rate(1 / rateHz);
+				Twist twist;
+					for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
+		
+						twist.linear.x = s;							
+						pubCmdVel.publish(twist);
+						
+						rate.sleep();
+					}
+				}
+			pubCmdVel.publish(twist_stop);
+			pubNavigationStateHelper(NAV_AVOIDING);
         }
 		break;
-        case NAV_CHECKING_OBSTACLE: //NYI
+        case NAV_CHECKING_OBSTACLE: //DEPRECATED
         {	
 			ROS_WARN("NAV_OBSTACLE_DETECTED");
 		}
