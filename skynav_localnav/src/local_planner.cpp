@@ -17,8 +17,9 @@ using namespace geometry_msgs;
 using namespace sensor_msgs;
 using namespace std;
 
-ros::Publisher pubObjectOutlines, pubWaypoints;
+ros::Publisher pubObjectOutlines, pubWaypoints, pubNavigationState;
 ros::Subscriber subObstacles, subNavigationState, subAbsoluteTargetPose;
+
 ros::ServiceServer servServerWaypointCheck;
 ros::ServiceClient servClientCurrentPose;
 
@@ -34,7 +35,6 @@ uint8_t mControl_NavigationState;			// the state which motion_control is in.
 bool compare(const Point32 &p, const Point32 &q){
 	return p.x < q.x || (p.x == q.x && p.y < q.y);
 }
-
 
 //compare both points to each other
 bool compare_Point(Point p, Point q){
@@ -65,7 +65,6 @@ Pose getCurrentPose() {
 		ros::shutdown();
 	}
 }
-
 
 //calculate distance between two point with use of pythagoras
 double calcDistance(Point a, Point b){
@@ -121,7 +120,6 @@ PointCloud convex_hull(vector<Point32> P){
 	return PC;
 }
 
-
 //function to call convex hull determination for each object
 void convexhullFunction(){	
 	mObjectOutlines.clear();	//clear the outlines and replace with new data
@@ -133,7 +131,6 @@ void convexhullFunction(){
 		pubObjectOutlines.publish((*outlineIt) );
 	}	
 }
-
 
 void subNavigationStateCallback(const std_msgs::UInt8& msg ){
 	mControl_NavigationState = msg.data;
@@ -307,7 +304,6 @@ boost::optional<Point> recursiveBug(const Point currentPos,const Point targetPos
 	return boost::optional<Point>(nwTarget);	//return true with new target
 }
 
-
 //function to determine if there is a colission, where, and (if needed) call for a new waypoint calculation.
 //if recursiveBugNeeded is true, the return value is the new waypoint calculated with the recursivebug algorithm, if false: the return is the collisionpoint itself
 boost::optional<Point> waypointCheck(Point pPath1, Point pPath2, bool recursiveBugNeeded){
@@ -397,7 +393,6 @@ boost::optional<Point> waypointCheck(Point pPath1, Point pPath2, bool recursiveB
 	//ROS_INFO("No collisions found on current track");
 	return boost::optional<Point>();  //return false 
 }
-    
 
 // receive the two coordinates that make up the current path and check for colission with known objects.
 // objects consist of a set of coordinates that determine the CONVEX outline of the object.
@@ -425,8 +420,14 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 	return true;
 }
 
+void interruptNavigationState(const std_msgs::UInt8 pubmsg){
+	mControl_NavigationState = pubmsg.data;
+	pubNavigationState.publish(pubmsg);
+	
+	return;	
+}
 
-// call colissioncheck function. if colission occurs, set navigation state 
+// call colissioncheck function. if colission occurs, publish interrupt navigationstate for motion_control 
 void collisionCheck(){
 	
 	convexhullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?	
@@ -441,7 +442,10 @@ void collisionCheck(){
 
 	boost::optional<Point> collision;
 	if((collision = waypointCheck(currentPose.position, targetPose.position, false))){
-		//ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
+		std_msgs::UInt8 msg;		
+		msg.data = 6;
+		interruptNavigationState(msg);
+		ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
 	}	 
 	return;
 }
@@ -457,6 +461,7 @@ int main(int argc, char **argv) {
     //pubs
     pubWaypoints = n_control.advertise<nav_msgs::Path>("checked_waypoints", 32);
     pubObjectOutlines = n.advertise<PointCloud>("objectOutlines", 10);
+    pubNavigationState = n_control.advertise<std_msgs::UInt8>("navigation_state_interrupt", 0);
 
     //subs
     subObstacles = n.subscribe("obstacles", 1024, subObstaclesCallback);

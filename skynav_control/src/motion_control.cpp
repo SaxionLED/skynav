@@ -69,12 +69,16 @@ void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
     ROS_INFO("path received by motion control");
 }
 
-void subNavigationStateCallback(const std_msgs::UInt8::ConstPtr& msg) {
+//callback to change navigationstate on an interrupt from outside
+void subNavigationStateInterruptCallback(const std_msgs::UInt8::ConstPtr& msg) {
+	mNavigationState = msg->data;
+	ROS_WARN("nav_state interrupted, changed to (%u)", msg->data);
 
-    //    ROS_INFO("NAV STATE CALLBACK (%d)", msg->data);
-    mNavigationState = msg->data;
+    pubNavigationState.publish(msg);
+	return;
 }
 
+//function to change navigationstate from within this node, and publish current state to the outside
 void pubNavigationStateHelper(NAVIGATION_STATE state) {
 
     // set the local state to ensure there is no delay
@@ -83,7 +87,7 @@ void pubNavigationStateHelper(NAVIGATION_STATE state) {
     std_msgs::UInt8 pubmsg;
     pubmsg.data = state;
     pubNavigationState.publish(pubmsg);
-    //ROS_INFO("nav state changed to %u", state);
+    //ROS_INFO("nav state function changed to %u", state);
 }
 
 void setMovementState(MOVEMENT_STATE moveState) {
@@ -191,7 +195,6 @@ void check_collision_thread(const Point absTarget){
 	}
 	ROS_INFO("collision check thread ended");
 }
-
 
 bool posesEqual(Pose currentPose, Pose targetPose) {
 
@@ -303,7 +306,6 @@ bool motionForward(const Point target, const Point absTarget) {
         return false;
 }
 
-
 void navigate() {
 
     switch (mNavigationState) {
@@ -317,7 +319,7 @@ void navigate() {
         break;
         case NAV_POSE_REACHED:
         {
-            ROS_WARN("NAV_POSE_REACHED");
+			ROS_WARN("NAV_POSE_REACHED");
             if (mCurrentPath->size() == 1) { // just finished the last waypoint, about to remove it, but take orientation first
                 ROS_INFO("waypoint list empty, assuming end orientation");
                 
@@ -332,7 +334,10 @@ void navigate() {
 					Pose currentPose = getCurrentPose();
                     if (posesEqual(currentPose, mCurrentPath->front().pose)) { // if within error value of target
                         mCurrentPath->pop_front();
-                    }
+                    }else{
+						ROS_ERROR("target not quite reached; compensating");
+						ros::Rate(5).sleep();
+					}
                 } else {
 				    ROS_INFO("nav pose reached unchecked, continue"); 
 					mCurrentPath->pop_front();					
@@ -462,7 +467,7 @@ void navigate() {
 						}
 						double dist_traversed = relativeTargetPose.position.x - (calcDistance(currentPose.position,originalPose.position));
 						if(dist_traversed > breakDist){
-							getCurrentVelocity();
+							//getCurrentVelocity();
 							//do nothing, continue moving	
 						}else{
 							setMovementState(MOV_DECEL);
@@ -500,6 +505,7 @@ void navigate() {
 					break;
 					}		
 				}
+				ros::spinOnce();	//check for callbacks
 				minimumSleep.sleep();
 			}		
 		}
@@ -507,7 +513,11 @@ void navigate() {
         case NAV_AVOIDING: //NYI
 		{	
 			ROS_WARN("NAV_AVOIDING");
-			ros::Duration(2).sleep();
+			//TODO
+			//move until > 1/2 laser range forward
+			//check path
+			//change path
+			ros::Duration(5).sleep();
 			pubNavigationStateHelper(NAV_READY);
         }   
 		break;
@@ -521,19 +531,19 @@ void navigate() {
 				double rateHz = 0.2;
 				ros::Rate rate(1 / rateHz);
 				Twist twist;
-					for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
-		
-						twist.linear.x = s;							
-						pubCmdVel.publish(twist);
-						
-						rate.sleep();
-					}
+				for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
+	
+					twist.linear.x = s;							
+					pubCmdVel.publish(twist);
+					
+					rate.sleep();
 				}
+			}
 			pubCmdVel.publish(twist_stop);
 			pubNavigationStateHelper(NAV_AVOIDING);
         }
 		break;
-        case NAV_CHECKING_OBSTACLE: //DEPRECATED
+        case NAV_CHECKING_OBSTACLE: //DEPRECATED?
         {	
 			ROS_WARN("NAV_OBSTACLE_DETECTED");
 		}
@@ -567,11 +577,12 @@ int main(int argc, char **argv) {
 
     //subs
     ros::Subscriber subCheckedWaypoints = mNode->subscribe("checked_waypoints", 32, subCheckedWaypointsCallback);
-    ros::Subscriber subNavigationState = mNode->subscribe("navigation_state", 0, subNavigationStateCallback);
+    ros::Subscriber subNavigationState = mNode->subscribe("navigation_state_interrupt", 0, subNavigationStateInterruptCallback);
 
     //services
     servClientCurrentPose = mNodeSLAM->serviceClient<skynav_msgs::current_pose>("current_pose");
     servClientCurrentVelocity = mNodeSLAM->serviceClient<skynav_msgs::current_velocity>("current_velocity");
+    
     servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
 
     // hz
