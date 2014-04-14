@@ -2,6 +2,7 @@
 #include <math.h>
 #include <nav_msgs/Path.h>
 #include <skynav_msgs/waypoint_check.h>
+#include <skynav_msgs/current_pose.h>
 #include <skynav_msgs/Object.h>
 #include <skynav_msgs/Objects.h>
 #include <sensor_msgs/PointCloud.h>
@@ -9,7 +10,8 @@
 #include <geometry_msgs/Point.h>
 #include <std_msgs/UInt8.h>
 #include <geometry_msgs/PoseStamped.h>
-
+#include <geometry_msgs/Pose.h>
+#include <boost/optional.hpp>
 
 using namespace geometry_msgs;
 using namespace sensor_msgs;
@@ -18,6 +20,7 @@ using namespace std;
 ros::Publisher pubObjectOutlines, pubWaypoints;
 ros::Subscriber subObstacles, subNavigationState, subAbsoluteTargetPose;
 ros::ServiceServer servServerWaypointCheck;
+ros::ServiceClient servClientCurrentPose;
 
 vector<PointCloud> mObstacles;
 vector<PointCloud> mObjectOutlines;
@@ -26,7 +29,6 @@ Point mNewWaypoint;							//new waypoint calculated by recursiveBug
 
 PoseStamped mCurrentAbsoluteTargetPose;		//the current next target pose, as published by motion_control
 uint8_t mControl_NavigationState;			// the state which motion_control is in.
-
 
 //compare function for sorting algorithm
 bool compare(const Point32 &p, const Point32 &q){
@@ -40,6 +42,28 @@ bool compare_Point(Point p, Point q){
 		return true;
 	}
 	return false;
+}
+
+//request the current pose
+Pose getCurrentPose() {
+	try{
+		Pose currentPose;
+
+		skynav_msgs::current_pose poseService;
+
+		if (servClientCurrentPose.call(poseService)) {
+
+			currentPose = poseService.response.pose;
+
+		} else {
+			ROS_ERROR("Failed to call current_pose service from local_planner");
+			ros::shutdown();
+		}
+		return currentPose;
+	}catch(exception& e){
+		ROS_ERROR("exception caught: %s",e.what());
+		ros::shutdown();
+	}
 }
 
 
@@ -105,7 +129,6 @@ void convexhullFunction(){
 	for(vector<PointCloud>::iterator it = mObstacles.begin(); it!= mObstacles.end(); ++it){
 		mObjectOutlines.push_back(convex_hull((*it).points));
 	}
-	//ROS_INFO("outlines %d", mObjectOutlines.size());	
 	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
 		pubObjectOutlines.publish((*outlineIt) );
 	}	
@@ -114,7 +137,7 @@ void convexhullFunction(){
 
 void subNavigationStateCallback(const std_msgs::UInt8& msg ){
 	mControl_NavigationState = msg.data;
-	//ROS_INFO("Current NavigationState: %d", msg.data);	
+	//ROS_INFO("localnav NavigationState: %d", msg.data);	
 }
 
 void subAbsoluteTargetPoseCallback(const PoseStamped& msg){
@@ -133,7 +156,7 @@ void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 
 
 //recursive bug algorithm for object avoidance
-bool recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC){
+boost::optional<Point> recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC){
 	//ROS_INFO("recursive_bug");
 	
 	bool foundNew = false;
@@ -258,7 +281,7 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 	//check for errors with calculated extremes //TODO more checks
 	if((compare_Point(obstacleExtremeLeft,collisionPoint)) && (compare_Point(obstacleExtremeRight,collisionPoint))){
 		ROS_ERROR("no extremes found besides collisionpoint itself");
-		return false;
+		return boost::optional<Point>();	//return false;
 	}
 	
 	//calc left extreme dist;   
@@ -280,30 +303,15 @@ bool recursiveBug(const Point currentPos,const Point targetPos, const Point coll
 	nwTarget.x =  truncateValue(currentPos.x + cos(angleTowardShortestExtreme + (offsetDegree * M_PI / 180)) * calcDistance(currentPos, shortestExtremeToTarget));
 	nwTarget.y =  truncateValue(currentPos.y + sin(angleTowardShortestExtreme + (offsetDegree * M_PI / 180)) * calcDistance(currentPos, shortestExtremeToTarget));
 	
-	mNewWaypoint = nwTarget;
-	return true;
-	
-
+	//mNewWaypoint = nwTarget;
+	return boost::optional<Point>(nwTarget);	//return true with new target
 }
-    
-    
-// receive the two coordinates that make up the current path and check for colission with known objects.
-// objects consist of a set of coordinates that determine the CONVEX outline of the object.
-// the line (edge) between two consecutive coordinates can be checked for colission with the path  
-// if the path is free, set pathChanged on true and return, otherwise call the recursive bug algorithm 
-// and return a new coordinate for the reroute and and return true 	// TODO margin, eg robot size
-bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
 
-	convexhullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?
+
+//function to determine if there is a colission, where, and (if needed) call for a new waypoint calculation.
+//if recursiveBugNeeded is true, the return value is the new waypoint calculated with the recursivebug algorithm, if false: the return is the collisionpoint itself
+boost::optional<Point> waypointCheck(Point pPath1, Point pPath2, bool recursiveBugNeeded){
 	
-	if(mObjectOutlines.empty()){
-		//ROS_INFO("No objects to check");
-		return true;	//if there are no objects currently known, dont calculate anything and return
-	}
-	
-    Point pPath1 = req.currentPos;
-    Point pPath2 = req.targetPos;
-    					
 	//line function for path Ax+By=C
 	double A1 = pPath2.y-pPath1.y;
 	double B1 = pPath1.x - pPath2.x;
@@ -318,7 +326,7 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 	vector<PointCloud> intersect_obstacles;
 	bool collisionsFound=false;
 	
-    for (vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt != mObjectOutlines.end(); ++outlineIt) {
+	for (vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt != mObjectOutlines.end(); ++outlineIt) {
 		if((*outlineIt).points.size() >= 2){
 			for(int i = 0, j = 1; j<(*outlineIt).points.size(); ++i,++j){
 
@@ -354,6 +362,7 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 			}
 		}
 	}
+	
 	if(collisionsFound){
 		//find relevant colission from set of colissions with pythagoras
 		Point relColission;
@@ -371,29 +380,79 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 		}		
 		//ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
 		
-		//calculate new Point newPoint with recursive bug algorithm
-		if(recursiveBug(pPath1,pPath2,relColission, relObject)){
-			resp.pathChanged = 1;
-			resp.newPos = mNewWaypoint;
-			//ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
-			ROS_INFO("New waypoint at(%f,%f)",mNewWaypoint.x, mNewWaypoint.y);
-			return true;
-		}			
+		if(recursiveBugNeeded){
+			//calculate new Point newPoint with recursive bug algorithm
+			boost::optional<Point> newPoint;
+			if((newPoint = recursiveBug(pPath1,pPath2,relColission, relObject))){
+				//ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
+				return boost::optional<Point>(newPoint);  //return true, with new waypoint 		
+			}			
+			ROS_ERROR("Collision detected, but no new waypoint could be calculated");
+			return boost::optional<Point>();  //return false 
+		}
+		//recursive bug is not neccesary, only collisionpoint is asked
+		return boost::optional<Point>(relColission); //return true with colissionpoint		
+	}
+	//no colissions found
+	//ROS_INFO("No collisions found on current track");
+	return boost::optional<Point>();  //return false 
+}
+    
+
+// receive the two coordinates that make up the current path and check for colission with known objects.
+// objects consist of a set of coordinates that determine the CONVEX outline of the object.
+// the line (edge) between two consecutive coordinates can be checked for colission with the path  
+// if the path is free, set pathChanged on true and return, otherwise call the recursive bug algorithm 
+// and return a new coordinate for the reroute and and return true 	// TODO margin, eg robot size
+bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
+
+	convexhullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?
+	
+	if(mObjectOutlines.empty()){
+		//ROS_INFO("No objects to check");
 		resp.pathChanged = 0;
-		ROS_ERROR("Collision detected, but no new waypoint could be calculated");
+		return true;	//if there are no objects currently known, dont calculate anything and return
+	}
+	//call the colissioncheck algorithm. if colissioncheck is true, new waypoint is returned, else there is no colission	
+	boost::optional<Point> newPoint;
+	if((newPoint = waypointCheck(req.currentPos, req.targetPos, true))){		//call for colissioncheck with recursiveBug active
+		resp.pathChanged = 1;
+		resp.newPos = *newPoint;
+		ROS_INFO("New waypoint at(%f,%f)",resp.newPos.x, resp.newPos.y);
 		return true;
-	}	
-	//ROS_INFO("No colission");
+	}
 	resp.pathChanged = 0;
 	return true;
 }
 
-int main(int argc, char **argv) {
 
+// call colissioncheck function. if colission occurs, set navigation state 
+void collisionCheck(){
+	
+	convexhullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?	
+	
+	if(mObjectOutlines.empty()){
+		//ROS_INFO("No objects to check");
+		return;	//if there are no objects currently known, dont calculate anything and return
+	}
+	
+	Pose currentPose = getCurrentPose();
+	Pose targetPose = mCurrentAbsoluteTargetPose.pose;
+
+	boost::optional<Point> collision;
+	if((collision = waypointCheck(currentPose.position, targetPose.position, false))){
+		//ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
+	}	 
+	return;
+}
+ 
+ 
+int main(int argc, char **argv) {
     ros::init(argc, argv, "local_planner");
 
     ros::NodeHandle n("/localnav");
     ros::NodeHandle n_control("/control");
+    ros::NodeHandle n_slam("/slam");
 
     //pubs
     pubWaypoints = n_control.advertise<nav_msgs::Path>("checked_waypoints", 32);
@@ -404,11 +463,22 @@ int main(int argc, char **argv) {
 	subNavigationState= n_control.subscribe("navigation_state",0,subNavigationStateCallback);
 	subAbsoluteTargetPose = n_control.subscribe("target_pose",4,subAbsoluteTargetPoseCallback);
 	
-	
-    //services
+	//services
     servServerWaypointCheck = n.advertiseService("path_check", servServerWaypointCheckCallback);
+    
+	servClientCurrentPose = n_slam.serviceClient<skynav_msgs::current_pose>("current_pose");
 
-    ros::spin();
+	ros::Rate loop_rate(5); // loop every 200ms
+
+	while(ros::ok){
+		
+		ros::spinOnce();
+
+		if(mControl_NavigationState == 1){
+			collisionCheck();
+			loop_rate.sleep();
+		}	
+	}
 
     return 0;
 }
