@@ -1,8 +1,19 @@
 
+language:
+  - python
+  - cpp
+
+python:
+  - "2.7"
+
+compiler:
+  - gcc
 
 
 install:
   - sudo apt-get update -qq
   - mkdir -p /tmp/skynav_ws/src
 
+script:
+  - cd /tmp/skynav_ws
 
