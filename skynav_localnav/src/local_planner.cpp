@@ -23,13 +23,13 @@ ros::Subscriber subObstacles, subNavigationState, subAbsoluteTargetPose;
 ros::ServiceServer servServerWaypointCheck;
 ros::ServiceClient servClientCurrentPose;
 
-vector<PointCloud> mObstacles;
-vector<PointCloud> mObjectOutlines;
+vector<PointCloud> mObstacles;					//pointclouds that make up the objects
+vector<PointCloud> mObjectOutlines;				//outline of known objects, calculated by the convexhull function
 
-Point mNewWaypoint;							//new waypoint calculated by recursiveBug
+PoseStamped mCurrentAbsoluteTargetPose;			//the current next target pose, as published by motion_control
+uint8_t mControl_NavigationState;				//the state which motion_control is in.
 
-PoseStamped mCurrentAbsoluteTargetPose;		//the current next target pose, as published by motion_control
-uint8_t mControl_NavigationState;			// the state which motion_control is in.
+typedef boost::optional<Point> optionPoint;		//use boost::optional for boolean return when no viable return value can be returned.
 
 //compare function for sorting algorithm
 bool compare(const Point32 &p, const Point32 &q){
@@ -153,8 +153,13 @@ void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 
 
 //recursive bug algorithm for object avoidance
-boost::optional<Point> recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC){
-	//ROS_INFO("recursive_bug");
+optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC){
+	//ROS_INFO("recursive_bug %f,%f  --  %f,%f,  col@ %f,%f",currentPos.x, currentPos.y,targetPos.x, targetPos.y,collisionPoint.x, collisionPoint.y);
+	
+	if(objectPC.points.empty()){
+		ROS_WARN("Object size is zero");
+		return optionPoint();	//return false;
+	}
 	
 	bool foundNew = false;
 		
@@ -181,7 +186,7 @@ boost::optional<Point> recursiveBug(const Point currentPos,const Point targetPos
 
 		laser_coord.x = (currentPos.x + (cos(angleTowardTarget + angle) * laserDist));
 		laser_coord.y = (currentPos.y + (sin(angleTowardTarget + angle) * laserDist));
-        
+		
 		//calculate intersection point					
 		//line function for path Ax+By=C
 		A1 = laser_coord.y-currentPos.y;
@@ -232,7 +237,7 @@ boost::optional<Point> recursiveBug(const Point currentPos,const Point targetPos
 
 		laser_coord.x = (currentPos.x + (cos(angleTowardTarget - angle) * laserDist));
 		laser_coord.y = (currentPos.y + (sin(angleTowardTarget - angle) * laserDist));
-        
+
 		//calculate intersection point					
 		//line function for path Ax+By=C
 		A1 = laser_coord.y-currentPos.y;
@@ -278,14 +283,13 @@ boost::optional<Point> recursiveBug(const Point currentPos,const Point targetPos
 	//check for errors with calculated extremes //TODO more checks
 	if((compare_Point(obstacleExtremeLeft,collisionPoint)) && (compare_Point(obstacleExtremeRight,collisionPoint))){
 		ROS_ERROR("no extremes found besides collisionpoint itself");
-		return boost::optional<Point>();	//return false;
+		return optionPoint();	//return false;
 	}
 	
 	//calc left extreme dist;   
     double extremeLeftPathLength  = calcDistance(targetPos, obstacleExtremeLeft);
 	//calc right extreme dist    
 	double extremeRightPathLength = calcDistance(targetPos, obstacleExtremeRight);
-	//ROS_INFO("L: %f, R: %f",extremeLeftPathLength,extremeRightPathLength );
 	
 	//determine extreme closest to target, 
 	if (extremeLeftPathLength < extremeRightPathLength){
@@ -300,13 +304,13 @@ boost::optional<Point> recursiveBug(const Point currentPos,const Point targetPos
 	nwTarget.x =  truncateValue(currentPos.x + cos(angleTowardShortestExtreme + (offsetDegree * M_PI / 180)) * calcDistance(currentPos, shortestExtremeToTarget));
 	nwTarget.y =  truncateValue(currentPos.y + sin(angleTowardShortestExtreme + (offsetDegree * M_PI / 180)) * calcDistance(currentPos, shortestExtremeToTarget));
 	
-	//mNewWaypoint = nwTarget;
+	//ROS_INFO("new target waypoint at %f,%f", nwTarget.x, nwTarget.y);
 	return boost::optional<Point>(nwTarget);	//return true with new target
 }
 
 //function to determine if there is a colission, where, and (if needed) call for a new waypoint calculation.
 //if recursiveBugNeeded is true, the return value is the new waypoint calculated with the recursivebug algorithm, if false: the return is the collisionpoint itself
-boost::optional<Point> waypointCheck(Point pPath1, Point pPath2, bool recursiveBugNeeded){
+optionPoint waypointCheck(Point pPath1, Point pPath2, bool recursiveBugNeeded){
 	
 	//line function for path Ax+By=C
 	double A1 = pPath2.y-pPath1.y;
@@ -360,38 +364,38 @@ boost::optional<Point> waypointCheck(Point pPath1, Point pPath2, bool recursiveB
 	}
 	
 	if(collisionsFound){
-		//find relevant colission from set of colissions with pythagoras
+		//find relevant colission from set of colissions
 		Point relColission;
 		PointCloud relObject;
-		double colDistance = 4; //TODO maximum laser range
+		double colDistance = 9999; // initiate distance at "far from robot" TODO set certain distance
 		double newDist;
 
 		for(int i =0; i<colissions.size(); ++i){
 			newDist = calcDistance(pPath1,colissions.at(i));
-			if( newDist < colDistance){		
+			if( newDist < colDistance ){		
 				colDistance = newDist;		
 				relColission = colissions.at(i);
 				relObject = intersect_obstacles.at(i);
 			}
 		}		
-		//ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
+		//ROS_INFO("colission at (%f, %f), %d", relColission.x, relColission.y, relObject.points.size());
 		
 		if(recursiveBugNeeded){
 			//calculate new Point newPoint with recursive bug algorithm
-			boost::optional<Point> newPoint;
-			if((newPoint = recursiveBug(pPath1,pPath2,relColission, relObject))){
-				//ROS_INFO("colission at (%f, %f)", relColission.x, relColission.y);
-				return boost::optional<Point>(newPoint);  //return true, with new waypoint 		
+			optionPoint newPoint;
+			if((newPoint = recursiveBug(pPath1, pPath2, relColission, relObject))){
+				//ROS_INFO("newpoint at (%f, %f)", (*newPoint).x, (*newPoint).y);
+				return optionPoint(newPoint);  //return true, with new waypoint 		
 			}			
 			ROS_ERROR("Collision detected, but no new waypoint could be calculated");
-			return boost::optional<Point>();  //return false 
+			return optionPoint();  //return false 
 		}
 		//recursive bug is not neccesary, only collisionpoint is asked
-		return boost::optional<Point>(relColission); //return true with colissionpoint		
+		return optionPoint(relColission); //return true with colissionpoint		
 	}
 	//no colissions found
 	//ROS_INFO("No collisions found on current track");
-	return boost::optional<Point>();  //return false 
+	return optionPoint();  //return false 
 }
 
 // receive the two coordinates that make up the current path and check for colission with known objects.
@@ -409,7 +413,7 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 		return true;	//if there are no objects currently known, dont calculate anything and return
 	}
 	//call the colissioncheck algorithm. if colissioncheck is true, new waypoint is returned, else there is no colission	
-	boost::optional<Point> newPoint;
+	optionPoint newPoint;
 	if((newPoint = waypointCheck(req.currentPos, req.targetPos, true))){		//call for colissioncheck with recursiveBug active
 		resp.pathChanged = 1;
 		resp.newPos = *newPoint;
@@ -440,10 +444,10 @@ void collisionCheck(){
 	Pose currentPose = getCurrentPose();
 	Pose targetPose = mCurrentAbsoluteTargetPose.pose;
 
-	boost::optional<Point> collision;
+	optionPoint collision;
 	if((collision = waypointCheck(currentPose.position, targetPose.position, false))){
 		std_msgs::UInt8 msg;		
-		msg.data = 6;
+		msg.data = 6;		//TODO replace with NAVIGATION_STATE state;
 		interruptNavigationState(msg);
 		ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
 	}	 
@@ -470,6 +474,7 @@ int main(int argc, char **argv) {
 	
 	//services
     servServerWaypointCheck = n.advertiseService("path_check", servServerWaypointCheckCallback);
+    
     
 	servClientCurrentPose = n_slam.serviceClient<skynav_msgs::current_pose>("current_pose");
 

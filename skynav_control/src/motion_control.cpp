@@ -73,7 +73,6 @@ void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 void subNavigationStateInterruptCallback(const std_msgs::UInt8::ConstPtr& msg) {
 	mNavigationState = msg->data;
 	ROS_WARN("nav_state interrupted, changed to (%u)", msg->data);
-
     pubNavigationState.publish(msg);
 	return;
 }
@@ -510,18 +509,33 @@ void navigate() {
 			}		
 		}
 		break;
-        case NAV_AVOIDING: //NYI
+        case NAV_AVOIDING:
 		{	
 			ROS_WARN("NAV_AVOIDING");
-			//TODO
-			//move until > 1/2 laser range forward
-			//check path
-			//change path
+			//TODO calcdist(currentpose(), collisionpoint )
+			//TODO MOVE forward until (distance to colissionpoint <= 1/2 laser range) 
+			
+			Pose currentPose = getCurrentPose();
+			Pose absTarget = mCurrentPath->front().pose;
+			
+			skynav_msgs::waypoint_check srv;
+			srv.request.currentPos = currentPose.position;
+			srv.request.targetPos  = absTarget.position;
+			
+			//re-check obstruction of the path and calculate the detour.
+			if(servClientWaypointCheck.call(srv)){
+				if(srv.response.pathChanged){						  
+				  //ROS_INFO("new waypoint at %f,%f", srv.response.newPos.x, srv.response.newPos.y);
+				}
+			}else{
+				ROS_ERROR("failed to call waypoint check service from motion_control NAV_AVOIDING state ");
+			}
+			//TODO change path
 			ros::Duration(5).sleep();
 			pubNavigationStateHelper(NAV_READY);
         }   
 		break;
-        case NAV_OBSTACLE_DETECTED: //NYI
+        case NAV_OBSTACLE_DETECTED:
 		{	
 			ROS_WARN("NAV_OBSTACLE_DETECTED");	
 			Twist twist_stop;	
