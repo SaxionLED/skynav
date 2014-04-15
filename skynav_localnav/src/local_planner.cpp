@@ -154,13 +154,11 @@ void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 
 //recursive bug algorithm for object avoidance
 optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC){
-	//ROS_INFO("recursive_bug %f,%f  --  %f,%f,  col@ %f,%f",currentPos.x, currentPos.y,targetPos.x, targetPos.y,collisionPoint.x, collisionPoint.y);
-	
+
 	if(objectPC.points.empty()){
-		ROS_WARN("Object size is zero");
+		ROS_WARN("Object size is zero, stopping recursive bug");
 		return optionPoint();	//return false;
 	}
-	
 	bool foundNew = false;
 		
 	Point nwTarget;
@@ -171,7 +169,9 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	Point laser_coord;
 	
 	double offsetDegree=10; //TODO use robot radius to calculate new coordinate
-	double laserDist = 4;	
+	//double laserDist = 4;
+	double laserDist = calcDistance(currentPos, targetPos);	//TODO hack for the first colission check when path is received by waypoint_filter.
+
 	double angleTowardTarget = atan2((targetPos.y - currentPos.y),(targetPos.x - currentPos.x));
 
 	double A1,B1,C1; 	
