@@ -11,9 +11,6 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
-#include <boost/thread/thread.hpp>
-#include <boost/thread/mutex.hpp>
-
 
 // defines
 #define MOTION_VELOCITY                	0.2                      // speed in m/s
@@ -159,42 +156,6 @@ Twist getCurrentVelocity() {
 	}
 }
 
-//semi depricated. should run in other (its own?) ros_node.
-//function to run in seperate thread for continuesly checking colission
-void check_collision_thread(const Point absTarget){
-	ROS_INFO("checking for collision in seperate thread");
-	bool interrupted = false;
-	while(!interrupted){
-		try{
-			boost::this_thread::sleep(boost::posix_time::milliseconds(500));
-			Pose currentPose = getCurrentPose();
-			
-			skynav_msgs::waypoint_check srv;
-			srv.request.currentPos = currentPose.position;
-			srv.request.targetPos  = absTarget;
-			
-			//check if the path to the next waypoint is blocked by a known object
-			if(servClientWaypointCheck.call(srv)){
-				if(srv.response.pathChanged && mMovementState!=MOV_TURN){						  
-				  pubNavigationStateHelper(NAV_OBSTACLE_DETECTED);
-				}
-			}else{
-				ROS_ERROR("failed to call waypoint check service from motion_control colission check thread. check if node is active?");
-			}
-		}
-		catch(boost::thread_interrupted&){
-			ROS_INFO("collision check thread interrupted");
-			interrupted = true;
-			continue;
-		}catch(const exception& e){
-			ROS_ERROR("error in colissioncheck thread %s",e.what());
-			interrupted = true;
-			continue; 
-		}			
-	}
-	ROS_INFO("collision check thread ended");
-}
-
 bool posesEqual(Pose currentPose, Pose targetPose) {
 
     if (calcDistance(targetPose.position,currentPose.position)< DISTANCE_ERROR_ALLOWED) {
@@ -255,8 +216,6 @@ void motionTurn(const double theta) {
 bool motionForward(const Point target, const Point absTarget) {
     if (target.x > DISTANCE_ERROR_ALLOWED) {
 		
-		//boost::thread t(&check_collision_thread, absTarget);
-
 		const Pose originalPose = getCurrentPose();
 		
 		double distanceLeft = target.x;
@@ -298,8 +257,6 @@ bool motionForward(const Point target, const Point absTarget) {
 		
 		pubNavigationStateHelper(NAV_POSE_REACHED);
 
-		//t.interrupt();				
-		//t.join();
         return true;
     } else
         return false;
