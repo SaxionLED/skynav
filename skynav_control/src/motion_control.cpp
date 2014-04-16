@@ -474,21 +474,28 @@ void navigate() {
 			
 			Pose currentPose = getCurrentPose();
 			Pose absTarget = mCurrentPath->front().pose;
-			
+
 			skynav_msgs::waypoint_check srv;
 			srv.request.currentPos = currentPose.position;
 			srv.request.targetPos  = absTarget.position;
 			
-			//re-check obstruction of the path and calculate the detour.
+			//re-check obstruction of the path and calculate the detour. //TODO when object is larger than previously known.. dont insert at 0, this will create chaos!
 			if(servClientWaypointCheck.call(srv)){
-				if(srv.response.pathChanged){						  
-				  //ROS_INFO("new waypoint at %f,%f", srv.response.newPos.x, srv.response.newPos.y);
+				if(srv.response.pathChanged){
+					PoseStamped nwWaypoint;
+					nwWaypoint.pose.position = srv.response.newPos;
+					mCurrentPath->push_front(nwWaypoint);	// be careful here!	
+					//check if path from nwWaypoint to next doesnt collide.. if true, calculate new nwWaypoint 
+
+
+				}else{
+					ROS_INFO("False alarm");
 				}
 			}else{
 				ROS_ERROR("failed to call waypoint check service from motion_control NAV_AVOIDING state ");
 			}
 			//TODO change path
-			ros::Duration(5).sleep();
+			//ros::Duration(5).sleep();
 			pubNavigationStateHelper(NAV_READY);
         }   
 		break;
