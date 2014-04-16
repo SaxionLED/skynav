@@ -139,7 +139,7 @@ void subNavigationStateCallback(const std_msgs::UInt8& msg ){
 
 void subAbsoluteTargetPoseCallback(const PoseStamped& msg){
 	mCurrentAbsoluteTargetPose = msg;
-	//ROS_INFO("Current target pose: (%f,%f)", msg.pose.position.x, msg.pose.position.y);
+	ROS_INFO("Current Localnav target pose: (%f,%f)", msg.pose.position.x, msg.pose.position.y);
 }
 
 //receive a custom message, containing all up to date objects within sensor range, from obstacle detector
@@ -286,10 +286,10 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 		return optionPoint();	//return false;
 	}
 	
-	//calc left extreme dist;   
-    double extremeLeftPathLength  = calcDistance(targetPos, obstacleExtremeLeft);
-	//calc right extreme dist    
-	double extremeRightPathLength = calcDistance(targetPos, obstacleExtremeRight);
+	//calc path via left extreme   
+    double extremeLeftPathLength  = calcDistance(targetPos, obstacleExtremeLeft) + calcDistance(currentPos, obstacleExtremeLeft);
+	//calc path via right extreme    
+	double extremeRightPathLength = calcDistance(targetPos, obstacleExtremeRight) + calcDistance(currentPos, obstacleExtremeRight);;
 	
 	//determine extreme closest to target, 
 	if (extremeLeftPathLength < extremeRightPathLength){
@@ -424,6 +424,7 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 	return true;
 }
 
+//send a new NAVIGATION_STATE as interrupt to motion_control
 void interruptNavigationState(const std_msgs::UInt8 pubmsg){
 	mControl_NavigationState = pubmsg.data;
 	pubNavigationState.publish(pubmsg);
@@ -434,7 +435,7 @@ void interruptNavigationState(const std_msgs::UInt8 pubmsg){
 // call colissioncheck function. if colission occurs, publish interrupt navigationstate for motion_control 
 void collisionCheck(){
 	
-	convexhullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?	
+	convexhullFunction();	//Only call convex hull when asking for colissioncheck. TODO replace with concave hull function!?	
 	
 	if(mObjectOutlines.empty()){
 		//ROS_INFO("No objects to check");
