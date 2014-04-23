@@ -13,6 +13,8 @@
 #include <geometry_msgs/Pose.h>
 #include <boost/optional.hpp>
 
+# define ROBOTRADIUS 0.5 //the radius of the robot. TODO get this from somewhere robot dependent
+
 using namespace geometry_msgs;
 using namespace sensor_msgs;
 using namespace std;
@@ -168,7 +170,6 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	Point intersection = collisionPoint;
 	Point laser_coord;
 	
-	double offsetDegree=10; //TODO use robot radius to calculate new coordinate
 	//double laserDist = 4;
 	double laserDist = calcDistance(currentPos, targetPos);	//TODO hack for the first colission check when path is received by waypoint_filter.
 
@@ -291,20 +292,65 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	//calc path via right extreme    
 	double extremeRightPathLength = calcDistance(targetPos, obstacleExtremeRight) + calcDistance(currentPos, obstacleExtremeRight);;
 	
+	int angleSign;
 	//determine extreme closest to target, 
 	if (extremeLeftPathLength < extremeRightPathLength){
 		shortestExtremeToTarget=obstacleExtremeLeft;
+		angleSign = 1;
 	}else{
 		shortestExtremeToTarget = obstacleExtremeRight;
 		//apply offset sign
-        offsetDegree = offsetDegree * -1; //inverse the offset degree
+		angleSign = -1;
 	}
-	//calc new target	
-	double angleTowardShortestExtreme = atan2((shortestExtremeToTarget.y - currentPos.y), (shortestExtremeToTarget.x - currentPos.x));
-	nwTarget.x =  truncateValue(currentPos.x + cos(angleTowardShortestExtreme + (offsetDegree * M_PI / 180)) * calcDistance(currentPos, shortestExtremeToTarget));
-	nwTarget.y =  truncateValue(currentPos.y + sin(angleTowardShortestExtreme + (offsetDegree * M_PI / 180)) * calcDistance(currentPos, shortestExtremeToTarget));
 	
-	//ROS_INFO("new target waypoint at %f,%f", nwTarget.x, nwTarget.y);
+	//calculate new waypoint based on robot size and trigenomitry functions in 7 steps
+	double offsetRadius = 0.5 * ROBOTRADIUS; //half the robot radius
+	double distNewP;
+	double distNewP2;
+	double angleCollision;
+	double angleNewP;
+	double angleEx;
+	double angleExNewP;
+	
+	//I determine distances between known and detected points
+	double distCollision = calcDistance(currentPos,collisionPoint);
+	double distExtreme = calcDistance(currentPos, shortestExtremeToTarget);
+	double distExtrCollis = calcDistance(collisionPoint, shortestExtremeToTarget);
+	double distNwPCollis = (distExtrCollis + offsetRadius);
+	
+	double distCollision2 = pow(distCollision,2);
+	double distExtreme2 = pow(distExtreme,2);
+	double distExtrCollis2 = pow(distExtrCollis,2);
+	double distNwPCollis2 = pow(distNwPCollis,2); 
+
+	//II determine the angle between the edges at the colission
+	if(distExtrCollis == 0){
+		angleCollision = 1;
+	}else{
+		angleCollision = acos( (distExtrCollis2 + distCollision2 - distExtreme2 ) / (2 * (distExtrCollis * distExtreme) ) );
+	}
+	
+	//III determine the distance to the new waypoint
+	distNewP = sqrt(distNwPCollis2 + distCollision2 - (2 * distNwPCollis * distCollision * cos(angleCollision)) );
+	distNewP2 = pow(distNewP,2);
+	
+	//IV determine the angle between the current position and the extreme of the object
+	angleEx = atan2( (shortestExtremeToTarget.y - currentPos.y), (shortestExtremeToTarget.x - currentPos.x) );
+	
+	//V determine the angle between the edges to extreme and the new waypoint
+	angleExNewP = acos( (distExtreme2 + distNewP2 - offsetRadius)/(2 * (distExtreme * distNewP) ) ) * angleSign;
+	
+	//VI calculate the angle to the new waypoint
+	if(distExtrCollis == 0){
+		angleNewP = angleExNewP;
+	}else{
+		angleNewP = angleEx + angleExNewP;
+	}
+	
+	//VII calculate x and y coordinates of the new waypoint, based on distance and angle from current pos
+	nwTarget.x = truncateValue(	currentPos.x + cos(angleNewP) * distNewP	);
+	nwTarget.y = truncateValue(	currentPos.y + sin(angleNewP) * distNewP	);
+
 	return boost::optional<Point>(nwTarget);	//return true with new target
 }
 
@@ -467,6 +513,7 @@ int main(int argc, char **argv) {
     pubWaypoints = n_control.advertise<nav_msgs::Path>("checked_waypoints", 32);
     pubObjectOutlines = n.advertise<PointCloud>("objectOutlines", 10);
     pubNavigationState = n_control.advertise<std_msgs::UInt8>("navigation_state_interrupt", 0);
+    
 
     //subs
     subObstacles = n.subscribe("obstacles", 1024, subObstaclesCallback);
