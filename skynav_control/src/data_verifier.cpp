@@ -6,6 +6,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include <skynav_msgs/current_pose.h>
 
+#define SIMULATOR 						true 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
 
 using namespace sensor_msgs;
 using namespace geometry_msgs;
@@ -67,18 +68,20 @@ void subFilterLaserCallback(const LaserScan::ConstPtr& scan) {
 	scan_filtered.range_min = scan->range_min;
 	scan_filtered.range_max = scan->range_max;	
 	
-	int discard_angle = 30;
 	for(uint i = 0; i < scan->ranges.size(); ++i)	{
 		
-		//	// UNCOMMENT IF USING ROBOT INSTEAD OF SIMULATOR!
-		//	//limit the laser angle on the actual robot so the robot itself wont be seen as object.
-		//	//the lds has been mounted on the robot with a 90 degree turn.. which results in the 0 degree (front) of the robot being at the 270 degree of the lds output
+		if(!SIMULATOR){
+			//limit the laser angle on the actual robot so the robot itself wont be seen as object.
+			//the lds has been mounted with a 90 degree offset relative to the robot.. which results in the 0 degree (front) of the robot being at the 270 degree of the lds output
 
-		//if(i>discard_angle && i<180-discard_angle){
-			//scan_filtered.ranges.push_back( 0 );	// add 0 if outside limit or it ruins the rest of the angles (relient on array size)
-			//scan_filtered.intensities.push_back( 0 );
-			//continue;
-		//}
+			//if(i>30 && i<150){	//cap the laser so the robot wont see itself
+			//if(i<180){			//cap the laser so the robot only sees 180Degree in front of itself
+			if(i<225 || i>315){ 	//cap the laser to a 90 degree wide beam in front of the robot
+				scan_filtered.ranges.push_back( 0 );	// add 0 if outside limit or it ruins the rest of the angles (relient on array size)
+				scan_filtered.intensities.push_back( 0 );
+				continue;
+			}
+		}
 		
 		//filter the outer edge of the laser range out of the results
 		if( scan->ranges.at(i) > (scan->range_max - 0.1) || scan->ranges.at(i) < scan->range_min)	{	
