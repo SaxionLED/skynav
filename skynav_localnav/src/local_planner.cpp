@@ -13,13 +13,14 @@
 #include <geometry_msgs/Pose.h>
 #include <boost/optional.hpp>
 
-# define ROBOTRADIUS 0.5 //the radius of the robot. TODO get this from somewhere robot dependent
+#define ROBOTRADIUS 		0.5 	//the radius of the robot. TODO get this from somewhere robot dependent
+#define MAX_SENSORDIST 		4		//the outer range of the sensors
 
 using namespace geometry_msgs;
 using namespace sensor_msgs;
 using namespace std;
 
-ros::Publisher pubObjectOutlines, pubWaypoints, pubNavigationState;
+ros::Publisher pubObjectOutlines, pubWaypoints, pubNavigationState, pubObjectExtremes;
 ros::Subscriber subObstacles, subNavigationState, subAbsoluteTargetPose;
 
 ros::ServiceServer servServerWaypointCheck;
@@ -287,6 +288,24 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 		return optionPoint();	//return false;
 	}
 	
+	{
+		//DEBUB publish extremes for visual debugging purposes
+		PointCloud obExtremes;
+		obExtremes.header.stamp = ros::Time::now();
+		obExtremes.header.frame_id = "/map";
+		Point32 left;
+		Point32 right;
+		left.x = obstacleExtremeLeft.x;
+		left.y = obstacleExtremeLeft.y;
+		left.z = 0.20;
+		right.x = obstacleExtremeRight.x;
+		right.y = obstacleExtremeRight.y;
+		right.z = 0.20;
+		obExtremes.points.push_back(left);
+		obExtremes.points.push_back(right);
+		pubObjectExtremes.publish(obExtremes);
+	}
+	
 	//calc path via left extreme   
     double extremeLeftPathLength  = calcDistance(targetPos, obstacleExtremeLeft) + calcDistance(currentPos, obstacleExtremeLeft);
 	//calc path via right extreme    
@@ -493,10 +512,13 @@ void collisionCheck(){
 
 	optionPoint collision;
 	if((collision = waypointCheck(currentPose.position, targetPose.position, false))){
-		std_msgs::UInt8 msg;		
-		msg.data = 6;		//TODO replace with NAVIGATION_STATE state;
-		interruptNavigationState(msg);
-		ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
+		
+		if(calcDistance(currentPose.position, *collision) <= (0.5*MAX_SENSORDIST) ){
+			std_msgs::UInt8 msg;		
+			msg.data = 6;		//TODO replace with NAVIGATION_STATE state;
+			interruptNavigationState(msg);
+			ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
+		}
 	}	 
 	return;
 }
@@ -513,6 +535,7 @@ int main(int argc, char **argv) {
     pubWaypoints = n_control.advertise<nav_msgs::Path>("checked_waypoints", 32);
     pubObjectOutlines = n.advertise<PointCloud>("objectOutlines", 10);
     pubNavigationState = n_control.advertise<std_msgs::UInt8>("navigation_state_interrupt", 0);
+    pubObjectExtremes = n.advertise<PointCloud>("obstacleExtremes",2);
     
 
     //subs
