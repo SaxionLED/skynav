@@ -13,6 +13,9 @@
 #include <tf/transform_listener.h>
 #include <skynav_msgs/Objects.h>
 
+#define SIMULATOR 						true 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
+#define ROBOTRADIUS 					0.5 	//the radius of the robot in meters. TODO get this from somewhere robot dependent
+#define MAX_SENSORDIST 					4		//the outer range of the sensors in meters
 
 using namespace std;
 using namespace geometry_msgs;
@@ -32,8 +35,6 @@ struct compPoint {
             return false; // if x the same and y the same or second y greater
     }
 };
-
-
 
 int mObjectsFound = 0;
 
@@ -269,12 +270,40 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
         nextNewPoint:
         asm("NOP");
         
-    }
+    }    
+}
+
+//discard objects outside of certain range, or when a new scan has been done
+void forgetObjects(){
+	if(!SIMULATOR){
+		mObjects.clear();
+	}else{
+		try{
+		Pose currentPose = getCurrentPose();
+		
+		for(vector<PointCloud>::iterator objectIt = mObjects.begin(); objectIt!= mObjects.end(); ++objectIt){
+			for(vector<Point32>::iterator pointIt = (*objectIt).points.begin(); pointIt != (*objectIt).points.end(); ++pointIt){
+				double xyDistance = sqrt(pow(currentPose.position.x - (*pointIt).x,2) + (pow(currentPose.position.y - (*pointIt).y,2)));
+					if (xyDistance > MAX_SENSORDIST){					
+						(*objectIt).points.erase( pointIt--);	//carefull here	!					
+					}
+				}
+				if((*objectIt).points.empty()){
+					mObjects.erase(objectIt--); //careful here!
+				}
+					
+			}
+		}catch(exception& e){
+			ROS_ERROR("ERROR forgetting objects: %s",e.what());
+		}
+	}
 }
 
 //publish all known objects
 void publishObjects()	{
-		
+	
+	forgetObjects();	
+	
 	//ROS_INFO("%d objects", mObjects.size());
 	vector<PointCloud> obstacles;
 	vector<PointCloud>::iterator it;
@@ -290,34 +319,6 @@ void publishObjects()	{
 	skynav_msgs::Objects msg;
 	msg.objects = obstacles;
 	pubObstacles.publish(msg);
-}
-
-//discard objects outside of certain range
-void forgetObjects(){
-	try{
-	Pose currentPose = getCurrentPose();
-	const double xyRange = 4.0; //TODO get actual range of the laser scanner.
-	
-	for(vector<PointCloud>::iterator objectIt = mObjects.begin(); objectIt!= mObjects.end(); ++objectIt){
-		for(vector<Point32>::iterator pointIt = (*objectIt).points.begin(); pointIt != (*objectIt).points.end(); ++pointIt){
-			double xyDistance = sqrt(pow(currentPose.position.x - (*pointIt).x,2) + (pow(currentPose.position.y - (*pointIt).y,2)));
-				if (xyDistance > xyRange){					
-					(*objectIt).points.erase( pointIt--);	//carefull here	!					
-				}
-			}
-			if((*objectIt).points.empty()){
-				mObjects.erase(objectIt--); //careful here!
-			}
-				
-		}
-	}catch(exception& e){
-		ROS_ERROR("ERROR forgetting objects: %s",e.what());
-	}
-}
-
-// receive all objects and determine if they are obstacles (on the path)
-void subObstacleDetectionCallback(const skynav_msgs::Object::ConstPtr & msg) {
-    //TODO 
 }
 
 int main(int argc, char **argv) {
@@ -350,18 +351,12 @@ int main(int argc, char **argv) {
             
 		ros::spinOnce();
 		
-		//clean object memory
-		forgetObjects();
-		//TODO clean objects (convex hull function or similar)
-		//determineConvexHull();
-		//publish objects in range
 		publishObjects();
 		
 		loop_rate.sleep();
 		
 	}
-        
-    
+            
     delete mTransformListener;
 
 
