@@ -8,6 +8,8 @@
 #include <std_msgs/Header.h>
 #include <geometry_msgs/PoseStamped.h>
 
+#define SIMULATOR 						true 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
+
 using namespace std;
 using namespace geometry_msgs;
 
@@ -178,6 +180,9 @@ int main(int argc, char **argv) {
 
         ros::spinOnce();
         
+        if(!SIMULATOR){
+			publishCurrentPoseTF(); //only use with real robot. in the simulator this function causes massive errors
+		}
         publishTraversedPath();
 
         loop_rate.sleep();
