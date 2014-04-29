@@ -11,10 +11,11 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
+#include <math.h>
 
 // defines
 #define MOTION_VELOCITY                	0.2                      // speed in m/s
-#define TURN_VELOCITY					0.5						// turn speed in rad/s
+#define TURN_VELOCITY					0.3						// turn speed in rad/s
 #define ANGLE_ERROR_ALLOWED             M_PI / 180 * 1          // rads	// if too small, the robot may rotate infinitely
 #define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
@@ -51,6 +52,7 @@ ros::ServiceClient servClientCurrentPose, servClientWaypointCheck, servClientCur
 ros::Publisher pubCmdVel, pubNavigationState, pubTargetPoseStamped;
 
 list<PoseStamped>* mCurrentPath = new list<PoseStamped>;
+list<PoseStamped>* mOriginalPath = new list<PoseStamped>;
 double mEndOrientation = 0;
 
 ros::Timer mCmdVelTimeout;
@@ -60,8 +62,8 @@ uint8_t mMovementState = MOV_READY;		// initial movement_state
 void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 
     mCurrentPath = new list<PoseStamped>(msg->poses.begin(), msg->poses.end());
-
-    mEndOrientation = mCurrentPath->back().pose.orientation.z;
+	mOriginalPath = new list<PoseStamped>(msg->poses.begin(), msg->poses.end());
+    mEndOrientation = mOriginalPath->back().pose.orientation.z;
 
     ROS_INFO("path received by motion control");
 }
@@ -96,6 +98,7 @@ void setMovementState(MOVEMENT_STATE moveState) {
 void clearPath() {
 
     mCurrentPath->clear(); // clear the path
+    mOriginalPath->clear();
 }
 
 //calculate distance between two point with use of pythagoras
@@ -212,55 +215,7 @@ void motionTurn(const double theta) {
 
 }
 
-//depricated function as this is integrated into nav_moving state
-bool motionForward(const Point target, const Point absTarget) {
-    if (target.x > DISTANCE_ERROR_ALLOWED) {
-		
-		const Pose originalPose = getCurrentPose();
-		
-		double distanceLeft = target.x;
-		double rateHz = 0.2;
-		ros::Rate rate(1 / rateHz);
-		
-		for(double s = MOTION_VELOCITY / 16; s <= MOTION_VELOCITY; s *= 2)	{	// total distance travelled during this phase should be 0.0775 meter
-			Twist twist;
-			twist.linear.x = s;
-			
-			pubCmdVel.publish(twist);
-			
-			rate.sleep();
-		}
-		
-		ros::Rate minimumSleep(1000); //1ms
-		Pose currentPose = getCurrentPose();
 
-		while((target.x - sqrt(pow(currentPose.position.x - originalPose.position.x, 2) + pow(currentPose.position.y - originalPose.position.y, 2))) > 0.0775)	{	// TODO the 0.0775 should be a var and should be checked
-			currentPose = getCurrentPose();
-			minimumSleep.sleep();
-		}
-		rate.sleep();	// HACK: otherwise it wont reach target, could be because of inertia
-		
-		for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
-			
-			Twist twist;
-			twist.linear.x = s;
-			
-			pubCmdVel.publish(twist);
-			
-			rate.sleep();
-		}
-		
-		//ROS_INFO("pose %f, %f", getCurrentPose().position.x, getCurrentPose().position.y);
-		
-		Twist twist; // stop moving
-		pubCmdVel.publish(twist);
-		
-		pubNavigationStateHelper(NAV_POSE_REACHED);
-
-        return true;
-    } else
-        return false;
-}
 
 void navigate() {
 
@@ -309,12 +264,13 @@ void navigate() {
 				ROS_WARN("NAV_READY");
 				
 				PoseStamped absoluteTargetPose = mCurrentPath->front(); // always use index 0, if target reached, delete 0 and use the new 0
+				
 				absoluteTargetPose.header.frame_id = "/map";
 				absoluteTargetPose.header.stamp = ros::Time::now();
 
 				pubTargetPoseStamped.publish(absoluteTargetPose);          
 				ROS_INFO("target pose: (%f, %f)", absoluteTargetPose.pose.position.x, absoluteTargetPose.pose.position.y);
-
+				setMovementState(MOV_READY);
 				pubNavigationStateHelper(NAV_MOVING);
 			}else{
 				//IDLE
@@ -333,17 +289,20 @@ void navigate() {
 			Pose originalPose;				
 			PoseStamped absoluteTargetPose;
 			Pose relativeTargetPose;
+			Twist currentVelocity;
 			
-			double theta;					//relative angle to target
-			float breakDist = 0.0775;		//distance for robot to decel TODO
+			double theta;						//relative angle to target
+			float breakDist;// = 0.0775;		//distance for robot to decel 
+			double steadyVelocity = MOTION_VELOCITY;
 			
 			Twist twist_stop;
 			
-			bool in_motion = false;
+			bool in_motion = false;		//"is currently busy"  boolean
 			setMovementState(MOV_READY);
 			
 			while(mNavigationState == NAV_MOVING){ 		//while(!interrupted){
 				currentPose = getCurrentPose();
+				currentVelocity = getCurrentVelocity();
 				
 				switch(mMovementState){
 					case MOV_READY:
@@ -377,7 +336,7 @@ void navigate() {
 							pubCmdVel.publish(twist);
 							in_motion = true;
 						}						
-						
+
 						if(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
 							//do nothing, continue turning
 						}else{						
@@ -404,7 +363,7 @@ void navigate() {
 
 						Twist twist;
 											
-						for(double s = MOTION_VELOCITY / 16; s <= MOTION_VELOCITY; s *= 2)	{	// total distance travelled during this phase should be 0.0775 meter
+						for(double s = MOTION_VELOCITY / 16; s <= MOTION_VELOCITY; s *= 2)	{	
 							
 							twist.linear.x = s;
 							pubCmdVel.publish(twist);
@@ -421,14 +380,24 @@ void navigate() {
 							ROS_INFO("mov_steady");
 							in_motion = true;
 						}
+													
+						//calculate breaking distance
+						breakDist = 0;						
+						for(int i=0; i<=4;++i){
+								breakDist+= (currentVelocity.linear.x / (pow(2,i)))*0.2;
+						}
+							
 						double dist_traversed = relativeTargetPose.position.x - (calcDistance(currentPose.position,originalPose.position));
 						if(dist_traversed > breakDist){
-							//getCurrentVelocity();
 							//do nothing, continue moving	
+							//ROS_INFO("curVelocity %f",currentVelocity.linear.x);
+
 						}else{
+							ROS_INFO("curVelocity %f",currentVelocity.linear.x);
+							ROS_INFO("breakdist %f",breakDist);
+							steadyVelocity = currentVelocity.linear.x;
 							setMovementState(MOV_DECEL);
 							in_motion = false;
-							rate.sleep();	// HACK: otherwise it wont reach target, could be because of inertia
 						}	
 					}
 					break;
@@ -436,7 +405,7 @@ void navigate() {
 					{
 						ROS_INFO("mov_decel");
 						Twist twist;
-						for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
+						for(double s = steadyVelocity; s >= steadyVelocity / 16; s /= 2)	{
 			
 							twist.linear.x = s;							
 							pubCmdVel.publish(twist);
@@ -466,50 +435,17 @@ void navigate() {
 			}		
 		}
 		break;
-        case NAV_AVOIDING:
-		{	
-			ROS_WARN("NAV_AVOIDING");
-			//TODO calcdist(currentpose(), collisionpoint )
-			//TODO MOVE forward until (distance to colissionpoint <= 1/2 laser range) 
-			
-			Pose currentPose = getCurrentPose();
-			Pose absTarget = mCurrentPath->front().pose;
-
-			skynav_msgs::waypoint_check srv;
-			srv.request.currentPos = currentPose.position;
-			srv.request.targetPos  = absTarget.position;
-			
-			//re-check obstruction of the path and calculate the detour. //TODO when object is larger than previously known.. dont insert at 0, this will create chaos!
-			if(servClientWaypointCheck.call(srv)){
-				if(srv.response.pathChanged){
-					PoseStamped nwWaypoint;
-					nwWaypoint.pose.position = srv.response.newPos;
-					mCurrentPath->push_front(nwWaypoint);	// be careful here!	
-					//check if path from nwWaypoint to next doesnt collide.. if true, calculate new nwWaypoint 
-
-
-				}else{
-					ROS_INFO("False alarm");
-				}
-			}else{
-				ROS_ERROR("failed to call waypoint check service from motion_control NAV_AVOIDING state ");
-			}
-			//TODO change path
-			//ros::Duration(5).sleep();
-			pubNavigationStateHelper(NAV_READY);
-        }   
-		break;
-        case NAV_OBSTACLE_DETECTED:
+		case NAV_OBSTACLE_DETECTED:
 		{	
 			ROS_WARN("NAV_OBSTACLE_DETECTED");	
 			Twist twist_stop;	
-			Twist curVel = getCurrentVelocity();
-			if(abs(curVel.linear.x) > 0.05){
-				ROS_INFO("current velocity is: %f ,breaking", curVel.linear.x);
+			float curVel = getCurrentVelocity().linear.x;
+			if(abs(curVel) > 0.05){
+				//ROS_INFO("current velocity is: %f ,breaking", curVel);
 				double rateHz = 0.2;
 				ros::Rate rate(1 / rateHz);
 				Twist twist;
-				for(double s = MOTION_VELOCITY; s >= MOTION_VELOCITY / 16; s /= 2)	{
+				for(double s = curVel; s >= curVel / 16; s /= 2)	{
 	
 					twist.linear.x = s;							
 					pubCmdVel.publish(twist);
@@ -521,6 +457,35 @@ void navigate() {
 			pubNavigationStateHelper(NAV_AVOIDING);
         }
 		break;
+        case NAV_AVOIDING:
+		{	
+			ROS_WARN("NAV_AVOIDING");		
+			Pose currentPose = getCurrentPose();
+			Pose absTarget = mCurrentPath->front().pose;
+
+			skynav_msgs::waypoint_check srv;
+			srv.request.currentPos = currentPose.position;
+			srv.request.targetPos  = absTarget.position;
+			
+			//re-check obstruction of the path and calculate the detour. 
+			//TODO create a check if new path is inefficient. in that case, dont push_front
+			if(servClientWaypointCheck.call(srv)){
+				if(srv.response.pathChanged){
+					PoseStamped nwWaypoint;
+					nwWaypoint.pose.position = srv.response.newPos;
+					mCurrentPath->push_front(nwWaypoint);	// be careful here!	
+					
+					//todo check if path from nwWaypoint to next doesnt collide.. if true, calculate new nwWaypoint and push after current nwWaypoint
+
+				}else{
+					ROS_INFO("False alarm");
+				}
+			}else{
+				ROS_ERROR("failed to call waypoint check service from motion_control NAV_AVOIDING state ");
+			}
+			pubNavigationStateHelper(NAV_READY);
+        }   
+		break;      
         case NAV_CHECKING_OBSTACLE: //DEPRECATED?
         {	
 			ROS_WARN("NAV_OBSTACLE_DETECTED");
