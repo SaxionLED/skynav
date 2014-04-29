@@ -20,7 +20,7 @@ using namespace geometry_msgs;
 using namespace sensor_msgs;
 using namespace std;
 
-ros::Publisher pubObjectOutlines, pubWaypoints, pubNavigationState, pubObjectExtremes;
+ros::Publisher pubObjectOutlines, pubNavigationState, pubObjectExtremes;
 ros::Subscriber subObstacles, subNavigationState, subAbsoluteTargetPose;
 
 ros::ServiceServer servServerWaypointCheck;
@@ -93,7 +93,8 @@ double cross(const Point32 &O, const Point32 &A, const Point32 &B){
 // Asymptotic complexity: O(n log n).
 // Returns a pointcloud containing a list of points on the convex hull in counter-clockwise order.
 // Note: the last point in the returned list is the same as the first one.
-PointCloud convex_hull(vector<Point32> P){
+PointCloud convex_hull(PointCloud data){
+	vector<Point32> P = data.points;
 	PointCloud PC;
 	
 	int n = P.size(), k = 0;
@@ -128,8 +129,9 @@ void convexhullFunction(){
 	mObjectOutlines.clear();	//clear the outlines and replace with new data
 	
 	for(vector<PointCloud>::iterator it = mObstacles.begin(); it!= mObstacles.end(); ++it){
-		mObjectOutlines.push_back(convex_hull((*it).points));
+		mObjectOutlines.push_back(convex_hull((*it)));
 	}
+	
 	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
 		pubObjectOutlines.publish((*outlineIt) );
 	}	
@@ -142,7 +144,7 @@ void subNavigationStateCallback(const std_msgs::UInt8& msg ){
 
 void subAbsoluteTargetPoseCallback(const PoseStamped& msg){
 	mCurrentAbsoluteTargetPose = msg;
-	ROS_INFO("Current Localnav target pose: (%f,%f)", msg.pose.position.x, msg.pose.position.y);
+	//ROS_INFO("Current Localnav target pose: (%f,%f)", msg.pose.position.x, msg.pose.position.y);
 }
 
 //receive a custom message, containing all up to date objects within sensor range, from obstacle detector
@@ -507,8 +509,7 @@ void collisionCheck(){
 	convexhullFunction();	//Only call convex hull when asking for colissioncheck. TODO replace with concave hull function!?	
 	
 	if(mObjectOutlines.empty()){
-		//ROS_INFO("No objects to check");
-		return;	//if there are no objects currently known, dont calculate anything and return
+		return;				// dont calculate anything and return
 	}
 	
 	Pose currentPose = getCurrentPose();
@@ -536,16 +537,15 @@ int main(int argc, char **argv) {
     ros::NodeHandle n_slam("/slam");
 
     //pubs
-    pubWaypoints = n_control.advertise<nav_msgs::Path>("checked_waypoints", 32);
     pubObjectOutlines = n.advertise<PointCloud>("objectOutlines", 10);
     pubNavigationState = n_control.advertise<std_msgs::UInt8>("navigation_state_interrupt", 0);
     pubObjectExtremes = n.advertise<PointCloud>("obstacleExtremes",2);
     
 
     //subs
-    subObstacles = n.subscribe("obstacles", 1024, subObstaclesCallback);
+    subObstacles = n.subscribe("obstacles", 10, subObstaclesCallback);
 	subNavigationState= n_control.subscribe("navigation_state",0,subNavigationStateCallback);
-	subAbsoluteTargetPose = n_control.subscribe("target_pose",4,subAbsoluteTargetPoseCallback);
+	subAbsoluteTargetPose = n_control.subscribe("target_pose",0,subAbsoluteTargetPoseCallback);
 	
 	//services
     servServerWaypointCheck = n.advertiseService("path_check", servServerWaypointCheckCallback);
