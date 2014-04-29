@@ -289,7 +289,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	}
 	
 	{
-		//DEBUB publish extremes for visual debugging purposes
+		//DEBUG publish extremes for visual debugging purposes
 		PointCloud obExtremes;
 		obExtremes.header.stamp = ros::Time::now();
 		obExtremes.header.frame_id = "/map";
@@ -343,7 +343,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	double distNwPCollis2 = pow(distNwPCollis,2); 
 
 	//II determine the angle between the edges at the colission
-	if(distExtrCollis == 0){
+	if(distExtrCollis == 0){ //prevent nan values
 		angleCollision = 1;
 	}else{
 		angleCollision = acos( (distExtrCollis2 + distCollision2 - distExtreme2 ) / (2 * (distExtrCollis * distExtreme) ) );
@@ -360,7 +360,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	angleExNewP = acos( (distExtreme2 + distNewP2 - offsetRadius)/(2 * (distExtreme * distNewP) ) ) * angleSign;
 	
 	//VI calculate the angle to the new waypoint
-	if(distExtrCollis == 0){
+	if(distExtrCollis == 0){ //prevent nan values
 		angleNewP = angleExNewP;
 	}else{
 		angleNewP = angleEx + angleExNewP;
@@ -370,6 +370,10 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	nwTarget.x = truncateValue(	currentPos.x + cos(angleNewP) * distNewP	);
 	nwTarget.y = truncateValue(	currentPos.y + sin(angleNewP) * distNewP	);
 
+	if(isnan(nwTarget.x) || isnan(nwTarget.y)){
+		return boost::optional<Point>();		
+		ROS_ERROR("Targetpose is not valid, skipping targetPose!"); 	
+	}
 	return boost::optional<Point>(nwTarget);	//return true with new target
 }
 
@@ -517,7 +521,7 @@ void collisionCheck(){
 			std_msgs::UInt8 msg;		
 			msg.data = 6;		//TODO replace with NAVIGATION_STATE state;
 			interruptNavigationState(msg);
-			ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
+			//ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
 		}
 	}	 
 	return;
@@ -549,7 +553,7 @@ int main(int argc, char **argv) {
     
 	servClientCurrentPose = n_slam.serviceClient<skynav_msgs::current_pose>("current_pose");
 
-	ros::Rate loop_rate(5); // loop every 200ms
+	ros::Rate loop_rate(1); // loop every 1s
 
 	while(ros::ok){
 		
