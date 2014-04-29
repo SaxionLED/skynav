@@ -15,13 +15,14 @@
 
 // defines
 #define MOTION_VELOCITY                	0.2                      // speed in m/s
+#define MAX_VELOCITY					1.0						
 #define TURN_VELOCITY					0.3						// turn speed in rad/s
 #define ANGLE_ERROR_ALLOWED             M_PI / 180 * 1          // rads	// if too small, the robot may rotate infinitely
 #define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
 #define ROBOT_WAYPOINT_ACCURACY         false                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
 
-enum NAVIGATION_STATE { //TODO move this into a shared container (skynav_msgs perhaps?)
+enum NAVIGATION_STATE { 			//TODO move this into a shared container (skynav_msgs perhaps?)
     NAV_READY = 0,					//check for new path recieved
     NAV_MOVING = 1,					//calculate path to next waypoint, turn, accel, drive and decel.
     NAV_AVOIDING = 2,				//reroute past detected object
@@ -29,7 +30,8 @@ enum NAVIGATION_STATE { //TODO move this into a shared container (skynav_msgs pe
     NAV_ERROR = 4,					
     NAV_UNREACHABLE = 5,			
     NAV_OBSTACLE_DETECTED = 6,		//obstacle has been detected
-    NAV_CHECKING_OBSTACLE = 7		//Depricated?!
+    NAV_CHECKING_OBSTACLE = 7,		//Depricated?!
+    NAV_STOP = 8					//stop everything before continue with whatever
 };
 
 enum MOVEMENT_STATE{
@@ -106,13 +108,26 @@ double calcDistance(Point a, Point b){
 	return sqrt(pow((a.x - b.x),2) + pow((a.y - b.y),2));
 }
 
+void publishCmdVel(Twist twist)	{
+	
+	if(twist.linear.x > MAX_VELOCITY){
+		ROS_ERROR("Attempt to send higher than maximum velocity of %f. Changing to maximum: %f",twist.linear.x,MAX_VELOCITY);
+		twist.linear.x = MAX_VELOCITY;
+	}	
+	//publish to cmd_vel
+	pubCmdVel.publish(twist);
+
+	// this timer is to timeout the target location
+	//mCmdVelTimeout = mNode->createTimer(ros::Duration(t), cmdVelTimeoutCallback); //TODO timer value
+}
+
 void cmdVelTimeoutCallback(const ros::TimerEvent&) {
 
     mCmdVelTimeout.stop();
     pubNavigationStateHelper(NAV_READY); //TODO naming is poor here
     
-    Twist twist;	// empty twist, stops the robot
-    pubCmdVel.publish(twist);
+    Twist twist_stop;
+    pubCmdVel.publish(twist_stop);
     
     ROS_INFO("stopped timer");
 }
@@ -178,15 +193,6 @@ double calcShortestTurn(double a1, double a2) {
     return dif;
 }
 
-void publishCmdVel(Twist twist, double t)	{
-	
-	//publish to cmd_vel
-	pubCmdVel.publish(twist);
-
-	// this timer is to timeout the target location
-	mCmdVelTimeout = mNode->createTimer(ros::Duration(t), cmdVelTimeoutCallback); //TODO timer value
-}
-
 //semi depricated function as this is integrated into nav_moving state
 void motionTurn(const double theta) {	
 	
@@ -201,7 +207,7 @@ void motionTurn(const double theta) {
 		twist.angular.z = TURN_VELOCITY;
 	}
 	
-	pubCmdVel.publish(twist);
+	publishCmdVel(twist);
 
 	
 	while(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
@@ -211,7 +217,7 @@ void motionTurn(const double theta) {
 	}
 	
 	Twist twist_stop; // stop moving
-	pubCmdVel.publish(twist_stop);
+	publishCmdVel(twist_stop);
 
 }
 
@@ -292,7 +298,7 @@ void navigate() {
 			Twist currentVelocity;
 			
 			double theta;						//relative angle to target
-			float breakDist;// = 0.0775;		//distance for robot to decel 
+			float breakDist;					//distance for robot to decel 
 			double steadyVelocity = MOTION_VELOCITY;
 			
 			Twist twist_stop;
@@ -333,14 +339,14 @@ void navigate() {
 							} else {
 								twist.angular.z = TURN_VELOCITY;
 							}
-							pubCmdVel.publish(twist);
+							publishCmdVel(twist);
 							in_motion = true;
 						}						
 
 						if(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
 							//do nothing, continue turning
 						}else{						
-							pubCmdVel.publish(twist_stop); //stop movement
+							publishCmdVel(twist_stop); //stop movement
 							in_motion = false;
 							setMovementState(MOV_ACCEL);
 						}
@@ -366,7 +372,7 @@ void navigate() {
 						for(double s = MOTION_VELOCITY / 16; s <= MOTION_VELOCITY; s *= 2)	{	
 							
 							twist.linear.x = s;
-							pubCmdVel.publish(twist);
+							publishCmdVel(twist);
 							
 							rate.sleep();
 						}
@@ -384,7 +390,7 @@ void navigate() {
 						//calculate breaking distance
 						breakDist = 0;						
 						for(int i=0; i<=4;++i){
-								breakDist+= (currentVelocity.linear.x / (pow(2,i)))*0.2;
+								breakDist+= (abs(currentVelocity.linear.x / (pow(2,i)))*0.2);
 						}
 							
 						double dist_traversed = relativeTargetPose.position.x - (calcDistance(currentPose.position,originalPose.position));
@@ -408,11 +414,11 @@ void navigate() {
 						for(double s = steadyVelocity; s >= steadyVelocity / 16; s /= 2)	{
 			
 							twist.linear.x = s;							
-							pubCmdVel.publish(twist);
+							publishCmdVel(twist);
 							
 							rate.sleep();
 						}						
-						pubCmdVel.publish(twist_stop);
+						publishCmdVel(twist_stop);
 						in_motion = false;
 						setMovementState(MOV_REACHED);	
 					}
@@ -448,12 +454,12 @@ void navigate() {
 				for(double s = curVel; s >= curVel / 16; s /= 2)	{
 	
 					twist.linear.x = s;							
-					pubCmdVel.publish(twist);
+					publishCmdVel(twist);
 					
 					rate.sleep();
 				}
 			}
-			pubCmdVel.publish(twist_stop);
+			publishCmdVel(twist_stop);
 			pubNavigationStateHelper(NAV_AVOIDING);
         }
 		break;
@@ -497,6 +503,25 @@ void navigate() {
             clearPath();
         }
         break;
+        case NAV_STOP:
+        {
+			ROS_WARN("NAV_STOP");
+			double currentVelocity = getCurrentVelocity().linear.x;
+			Twist twist_stop;
+			Twist twist;
+			   ros::Rate rate(5); // each 200ms
+
+			for(double s = currentVelocity; s >= currentVelocity / 16; s /= 2)	{
+
+				twist.linear.x = s;							
+				publishCmdVel(twist);
+				
+				rate.sleep();
+			}						
+			publishCmdVel(twist_stop);
+            
+        }
+        break;
         default:
             ROS_ERROR("unrecognized navigation state found");
     }
@@ -519,7 +544,7 @@ int main(int argc, char **argv) {
     pubTargetPoseStamped = mNode->advertise<geometry_msgs::PoseStamped>("target_pose", 4);
 
     //subs
-    ros::Subscriber subCheckedWaypoints = mNode->subscribe("checked_waypoints", 32, subCheckedWaypointsCallback);
+    ros::Subscriber subCheckedWaypoints = mNode->subscribe("checked_waypoints", 1, subCheckedWaypointsCallback);
     ros::Subscriber subNavigationState = mNode->subscribe("navigation_state_interrupt", 0, subNavigationStateInterruptCallback);
 
     //services
@@ -531,11 +556,7 @@ int main(int argc, char **argv) {
     // hz
     ros::Rate loop_rate(10); // loop every 100ms
 
-    loop_rate.sleep(); // sleep a little to prevent double startup bug (calls loop twice in 1 spin)
-    loop_rate.sleep();
-    loop_rate.sleep();
-
-    //placeholder_ManualTargetPose();
+	ros::Duration(1).sleep();
 
     while (ros::ok()) {
 
