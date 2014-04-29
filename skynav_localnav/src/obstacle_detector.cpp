@@ -13,7 +13,7 @@
 #include <tf/transform_listener.h>
 #include <skynav_msgs/Objects.h>
 
-#define SIMULATOR 						true 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
+#define SIMULATOR 						false 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
 #define ROBOTRADIUS 					0.5 	//the radius of the robot in meters. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 					4		//the outer range of the sensors in meters
 
@@ -152,7 +152,7 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
 	}
 	catch (tf::TransformException& e)
 	{
-		ROS_ERROR("%s", e.what());
+		ROS_ERROR("obstacle_detector - %s", e.what());
 	}
 
 	if (pointCloud.points.size() > 0) {
@@ -168,7 +168,9 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
         pointCloud.header.frame_id = "/map";
 
         pubSensorData.publish(pointCloud);
-    }	
+    }else{
+	ROS_WARN("Empty laserscan data received");
+	}	
 }
 
 //detect objects within sensor range, compare to known objects and add/merge in object list
@@ -301,9 +303,7 @@ void forgetObjects(){
 
 //publish all known objects
 void publishObjects()	{
-	
-	forgetObjects();	
-	
+		
 	//ROS_INFO("%d objects", mObjects.size());
 	vector<PointCloud> obstacles;
 	vector<PointCloud>::iterator it;
@@ -319,6 +319,9 @@ void publishObjects()	{
 	skynav_msgs::Objects msg;
 	msg.objects = obstacles;
 	pubObstacles.publish(msg);
+	
+	forgetObjects();	
+
 }
 
 int main(int argc, char **argv) {
@@ -335,10 +338,9 @@ int main(int argc, char **argv) {
     pubObstacles = n.advertise<skynav_msgs::Objects>("obstacles", 1024);
 
     //subs
-    ros::Subscriber subSensors = n_control.subscribe("sensors", 1024, subSensorCallback); // raw unprocessed sensor values
-    ros::Subscriber subSensorData = n.subscribe("sensor_data", 1024, subObjectDetectionCallback);
-    //    ros::Subscriber subObjects = n.subscribe("objects", 256, subObstacleDetectionCallback);
-    ros::Subscriber subLaser = n_control.subscribe("laser_scan", 1024, subLaserScanCallback);
+    ros::Subscriber subSensors = n_control.subscribe("sensors", 10, subSensorCallback); // raw unprocessed sensor values
+    ros::Subscriber subSensorData = n.subscribe("sensor_data", 10, subObjectDetectionCallback);
+    ros::Subscriber subLaser = n_control.subscribe("laser_scan", 10, subLaserScanCallback);
 
     //services
     servClientCurrentPose = n_SLAM.serviceClient<skynav_msgs::current_pose>("current_pose");
