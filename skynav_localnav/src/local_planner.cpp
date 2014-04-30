@@ -12,6 +12,11 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Pose.h>
 #include <boost/optional.hpp>
+#include <pcl_ros/point_cloud.h>
+#include <pcl/point_types.h> 
+#include <pcl/surface/concave_hull.h>
+
+
 
 #define ROBOTRADIUS 		0.5 	//the radius of the robot. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 		4		//the outer range of the sensors
@@ -33,6 +38,9 @@ PoseStamped mCurrentAbsoluteTargetPose;			//the current next target pose, as pub
 uint8_t mControl_NavigationState;				//the state which motion_control is in.
 
 typedef boost::optional<Point> optionPoint;		//use boost::optional for boolean return when no viable return value can be returned.
+//typedef pcl::PointCloud<pcl::PointXYZ> PclPointCloud;
+//typedef pcl::ConcaveHull<pcl::PointXYZ> PclConcaveHull;
+//typedef pcl::PointXYZ PclPoint;
 
 //compare function for sorting algorithm
 bool compare(const Point32 &p, const Point32 &q){
@@ -124,12 +132,37 @@ PointCloud convex_hull(PointCloud data){
 	return PC;
 }
 
+PointCloud concave_hull(PointCloud data){
+	PointCloud PC;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::ConcaveHull<pcl::PointXYZ> chull;
+	
+	for(vector<Point32>::iterator it = data.points.begin(); it!= data.points.end(); ++it){
+		cloud_in->push_back(pcl::PointXYZ((*it).x,(*it).y,0));
+	}
+	
+	chull.setInputCloud (cloud_in);
+	chull.setAlpha (0.5);
+	chull.reconstruct (*cloud_out);
+	
+	for(pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it){
+		Point32 p;
+		p.x=(*it).x;
+		p.y=(*it).y;
+		PC.points.push_back(p);		
+	}
+	PC.header.stamp = ros::Time::now();
+    PC.header.frame_id = "/map";
+	return PC;
+}
+
 //function to call convex hull determination for each object
 void convexhullFunction(){	
 	mObjectOutlines.clear();	//clear the outlines and replace with new data
 	
 	for(vector<PointCloud>::iterator it = mObstacles.begin(); it!= mObstacles.end(); ++it){
-		mObjectOutlines.push_back(convex_hull((*it)));
+		mObjectOutlines.push_back(concave_hull((*it)));
 	}
 	
 	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
@@ -152,7 +185,9 @@ void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 	mObstacles.clear();
 
 	for(vector<PointCloud>::const_iterator objectIt = msg->objects.begin(); objectIt!= msg->objects.end(); ++objectIt){
-        mObstacles.push_back((*objectIt));
+        if((*objectIt).points.size()>5){
+			mObstacles.push_back((*objectIt));
+		}
 	}
 }
 

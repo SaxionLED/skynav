@@ -168,9 +168,8 @@ void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
         pointCloud.header.frame_id = "/map";
 
         pubSensorData.publish(pointCloud);
-    }else{
-	ROS_WARN("Empty laserscan data received");
-	}	
+    }
+	
 }
 
 //detect objects within sensor range, compare to known objects and add/merge in object list
