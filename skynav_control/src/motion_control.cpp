@@ -17,7 +17,8 @@
 #define MOTION_VELOCITY                	0.2                      // speed in m/s
 #define MAX_VELOCITY					1.0						
 #define TURN_VELOCITY					0.3						// turn speed in rad/s
-#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 1          // rads	// if too small, the robot may rotate infinitely
+#define ANGLE_ERROR_FIRST		  		M_PI / 180 * 20 		// rads // first stage angle check
+#define ANGLE_ERROR_ALLOWED             M_PI / 180 * 1          // rads	// second stage angle check for precision // if too small, the robot may rotate infinitely
 #define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
 #define ROBOT_WAYPOINT_ACCURACY         false                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
@@ -221,8 +222,6 @@ void motionTurn(const double theta) {
 
 }
 
-
-
 void navigate() {
 
     switch (mNavigationState) {
@@ -343,11 +342,40 @@ void navigate() {
 							in_motion = true;
 						}						
 
-						if(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
+						//turn rough angle
+						if(!(currentPose.orientation.z < theta + ANGLE_ERROR_FIRST && currentPose.orientation.z > theta - ANGLE_ERROR_FIRST))	{
 							//do nothing, continue turning
-						}else{						
+						}else{	
+							//ROS_INFO("1st stage rough turning done");					
 							publishCmdVel(twist_stop); //stop movement
+							rate.sleep();
+
+							currentPose = getCurrentPose();
+							Twist twist;
+							
+							//if the angle already falls within accepted error margin, continue
+							if(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
+								
+								if(fmod(currentPose.orientation.z - theta + (M_PI*2), M_PI*2) <= M_PI)	{
+									twist.angular.z = -0.5*TURN_VELOCITY;
+								} else {
+									twist.angular.z =  0.5*TURN_VELOCITY;
+								}
+								publishCmdVel(twist);
+								
+								while(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
+									//do nothing, continue turning
+									currentPose = getCurrentPose();
+									minimumSleep.sleep();
+								}
+							}
+							publishCmdVel(twist_stop); //stop movement
+
+							//ROS_INFO("2nd stage precision turning done");
+							
 							in_motion = false;
+							
+							rate.sleep();
 							setMovementState(MOV_ACCEL);
 						}
 					}
@@ -399,8 +427,6 @@ void navigate() {
 							//ROS_INFO("curVelocity %f",currentVelocity.linear.x);
 
 						}else{
-							ROS_INFO("curVelocity %f",currentVelocity.linear.x);
-							ROS_INFO("breakdist %f",breakDist);
 							steadyVelocity = currentVelocity.linear.x;
 							setMovementState(MOV_DECEL);
 							in_motion = false;
@@ -447,7 +473,7 @@ void navigate() {
 			Twist twist_stop;	
 			float curVel = getCurrentVelocity().linear.x;
 			if(abs(curVel) > 0.05){
-				//ROS_INFO("current velocity is: %f ,breaking", curVel);
+				ROS_INFO("current velocity is: %f ,breaking", curVel);
 				double rateHz = 0.2;
 				ros::Rate rate(1 / rateHz);
 				Twist twist;
@@ -492,7 +518,7 @@ void navigate() {
 			pubNavigationStateHelper(NAV_READY);
         }   
 		break;      
-        case NAV_CHECKING_OBSTACLE: //DEPRECATED?
+        case NAV_CHECKING_OBSTACLE: //DEPRECATED
         {	
 			ROS_WARN("NAV_OBSTACLE_DETECTED");
 		}
@@ -501,6 +527,7 @@ void navigate() {
         {
 			ROS_WARN("NAV_ERROR");
             clearPath();
+            
         }
         break;
         case NAV_STOP:
@@ -519,6 +546,11 @@ void navigate() {
 				rate.sleep();
 			}						
 			publishCmdVel(twist_stop);
+			
+			clearPath();
+			
+			pubNavigationStateHelper(NAV_READY);
+
             
         }
         break;
