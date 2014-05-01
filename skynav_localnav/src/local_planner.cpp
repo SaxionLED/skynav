@@ -32,15 +32,12 @@ ros::ServiceServer servServerWaypointCheck;
 ros::ServiceClient servClientCurrentPose;
 
 vector<PointCloud> mObstacles;					//pointclouds that make up the objects
-vector<PointCloud> mObjectOutlines;				//outline of known objects, calculated by the convexhull function
+vector<PointCloud> mObjectOutlines;				//outline of known objects, calculated by the convex / concave hull function
 
 PoseStamped mCurrentAbsoluteTargetPose;			//the current next target pose, as published by motion_control
 uint8_t mControl_NavigationState;				//the state which motion_control is in.
 
 typedef boost::optional<Point> optionPoint;		//use boost::optional for boolean return when no viable return value can be returned.
-//typedef pcl::PointCloud<pcl::PointXYZ> PclPointCloud;
-//typedef pcl::ConcaveHull<pcl::PointXYZ> PclConcaveHull;
-//typedef pcl::PointXYZ PclPoint;
 
 //compare function for sorting algorithm
 bool compare(const Point32 &p, const Point32 &q){
@@ -101,31 +98,56 @@ double cross(const Point32 &O, const Point32 &A, const Point32 &B){
 // Asymptotic complexity: O(n log n).
 // Returns a pointcloud containing a list of points on the convex hull in counter-clockwise order.
 // Note: the last point in the returned list is the same as the first one.
-PointCloud convex_hull(PointCloud data){
-	vector<Point32> P = data.points;
-	PointCloud PC;
+//PointCloud convex_hull(PointCloud data){
+	//vector<Point32> P = data.points;
+	//PointCloud PC;
 	
-	int n = P.size(), k = 0;
-	vector<Point32> H(2*n);
+	//int n = P.size(), k = 0;
+	//vector<Point32> H(2*n);
  
-	// Sort points lexicographically
-	sort(P.begin(), P.end(), compare);
+	//// Sort points lexicographically
+	//sort(P.begin(), P.end(), compare);
  
-	// Build lower hull
-	for (int i = 0; i < n; ++i) {
-		while (k >= 2 && cross(H[k-2], H[k-1], P[i]) <= 0) k--;
-		H[k++] = P[i];
+	//// Build lower hull
+	//for (int i = 0; i < n; ++i) {
+		//while (k >= 2 && cross(H[k-2], H[k-1], P[i]) <= 0) k--;
+		//H[k++] = P[i];
+	//}
+ 
+	//// Build upper hull
+	//for (int i = n-2, t = k+1; i >= 0; i--) {
+		//while (k >= t && cross(H[k-2], H[k-1], P[i]) <= 0) k--;
+		//H[k++] = P[i];
+	//}
+ 
+	//H.resize(k);
+	//for(int i = 0; i<H.size(); ++i){
+		//PC.points.push_back(H.at(i));	
+	//}
+	//PC.header.stamp = ros::Time::now();
+    //PC.header.frame_id = "/map";
+	//return PC;
+//}
+
+PointCloud convex_hull(PointCloud data){
+	PointCloud PC;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::ConvexHull<pcl::PointXYZ> chull;
+	
+	for(vector<Point32>::iterator it = data.points.begin(); it!= data.points.end(); ++it){
+		cloud_in->push_back(pcl::PointXYZ((*it).x,(*it).y,0));
 	}
- 
-	// Build upper hull
-	for (int i = n-2, t = k+1; i >= 0; i--) {
-		while (k >= t && cross(H[k-2], H[k-1], P[i]) <= 0) k--;
-		H[k++] = P[i];
-	}
- 
-	H.resize(k);
-	for(int i = 0; i<H.size(); ++i){
-		PC.points.push_back(H.at(i));	
+	
+	chull.setInputCloud (cloud_in);
+	chull.setDimension(2);
+	chull.reconstruct (*cloud_out);
+	
+	for(pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it){
+		Point32 p;
+		p.x=(*it).x;
+		p.y=(*it).y;
+		PC.points.push_back(p);		
 	}
 	PC.header.stamp = ros::Time::now();
     PC.header.frame_id = "/map";
@@ -158,12 +180,17 @@ PointCloud concave_hull(PointCloud data){
 }
 
 //function to call convex hull determination for each object
-void convexhullFunction(){	
+void hullFunction(){	
 	mObjectOutlines.clear();	//clear the outlines and replace with new data
 	
 	for(vector<PointCloud>::iterator it = mObstacles.begin(); it!= mObstacles.end(); ++it){
-		mObjectOutlines.push_back(concave_hull((*it)));
-	}
+		if((*it).points.size()>10){
+			mObjectOutlines.push_back(concave_hull((*it)));
+		}else if ((*it).points.size()>5){
+			mObjectOutlines.push_back(convex_hull((*it)));
+		} else if((*it).points.size()>=2)
+			mObjectOutlines.push_back((*it));
+		}
 	
 	for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt){
 		pubObjectOutlines.publish((*outlineIt) );
@@ -185,9 +212,7 @@ void subObstaclesCallback(const skynav_msgs::Objects::ConstPtr& msg) {
 	mObstacles.clear();
 
 	for(vector<PointCloud>::const_iterator objectIt = msg->objects.begin(); objectIt!= msg->objects.end(); ++objectIt){
-        if((*objectIt).points.size()>5){
-			mObstacles.push_back((*objectIt));
-		}
+		mObstacles.push_back((*objectIt));
 	}
 }
 
@@ -403,6 +428,9 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 		angleNewP = angleEx + angleExNewP;
 	}
 	
+	//Hack calculate the point further along the same angle, for colission detection when the object is wider than known at the moment
+	distNewP = distNewP+0.5;
+	
 	//VII calculate x and y coordinates of the new waypoint, based on distance and angle from current pos
 	nwTarget.x = truncateValue(	currentPos.x + cos(angleNewP) * distNewP	);
 	nwTarget.y = truncateValue(	currentPos.y + sin(angleNewP) * distNewP	);
@@ -511,7 +539,7 @@ optionPoint waypointCheck(Point pPath1, Point pPath2, bool recursiveBugNeeded){
 // and return a new coordinate for the reroute and and return true 	// TODO margin, eg robot size
 bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
 
-	convexhullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?
+	hullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?
 	
 	if(mObjectOutlines.empty()){
 		//ROS_INFO("No objects to check");
@@ -541,7 +569,7 @@ void interruptNavigationState(const std_msgs::UInt8 pubmsg){
 // call colissioncheck function. if colission occurs, publish interrupt navigationstate for motion_control 
 void collisionCheck(){
 	
-	convexhullFunction();	//Only call convex hull when asking for colissioncheck. TODO replace with concave hull function!?	
+	hullFunction();	//Only call convex hull when asking for colissioncheck. 
 	
 	if(mObjectOutlines.empty()){
 		return;				// dont calculate anything and return
