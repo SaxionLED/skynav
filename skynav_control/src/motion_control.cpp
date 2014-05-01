@@ -491,7 +491,8 @@ void navigate() {
 		break;
         case NAV_AVOIDING:
 		{	
-			ROS_WARN("NAV_AVOIDING");		
+			ROS_WARN("NAV_AVOIDING");
+			ros::Duration(1).sleep();	//sleep 1 second for the sensors to calibrate		
 			Pose currentPose = getCurrentPose();
 			Pose absTarget = mCurrentPath->front().pose;
 
