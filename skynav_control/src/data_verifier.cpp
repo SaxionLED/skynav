@@ -39,7 +39,7 @@ Pose getCurrentPose() {
 
 void subNavigationStateCallback(const std_msgs::UInt8& msg ){
 	mControl_NavigationState = msg.data;
-	ROS_INFO("localnav NavigationState: %d", msg.data);	
+	//ROS_INFO("localnav NavigationState: %d", msg.data);	
 }
 
 void subSensorsCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
@@ -52,7 +52,6 @@ void subSensorsCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
 void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg)        {
     
     // check limits here
-    ROS_INFO("odom");
     pubOdometry.publish(msg);    
 }
 
@@ -95,21 +94,7 @@ void subFilterLaserCallback(const LaserScan::ConstPtr& scan) {
 				scan_filtered.intensities.push_back( 0 );
 				continue;
 			}
-		}else{
-			if(mControl_NavigationState == 2 || mControl_NavigationState == 6){
-				lLimit = 90; //cap the laser so the robot only sees 180Degree in front of itself
-				hLimit = 270;
-			}else{	
-				lLimit = 135; //cap the laser to a 90 degree wide beam in front of the robot
-				hLimit = 215;
-			}
-			if(i<lLimit || i>hLimit){				//if(i>30 && i<150){	//cap the laser so the robot wont see itself
-				scan_filtered.ranges.push_back( 0 );	// add 0 if outside limit or it ruins the rest of the angles (relient on array size)
-				scan_filtered.intensities.push_back( 0 );
-				continue;
-			}
 		}
-		
 		//filter the outer edge of the laser range out of the results
 		if( scan->ranges.at(i) > (scan->range_max - 0.1) || scan->ranges.at(i) < scan->range_min)	{	
 			scan_filtered.ranges.push_back( 0 );	// add 0 if outside limit or it ruins the rest of the angles (relient on array size)

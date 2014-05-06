@@ -276,7 +276,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 
 //discard objects outside of certain range, or when a new scan has been done
 void forgetObjects(){
-	if(!SIMULATOR){
+	if(!SIMULATOR){	//if runs on actual robot, use only transient data from each laser scan. dont keep objects in memory
 		mObjects.clear();
 	}else{
 		try{

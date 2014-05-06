@@ -113,7 +113,7 @@ void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg) {		// thi
             
             publishCurrentPoseTF();
 
-            ROS_INFO("pose updated! x: %f, y: %f, theta: %.2f degrees", mCurrentPose.position.x, mCurrentPose.position.y, (mCurrentPose.orientation.z * 180 / M_PI));
+            //ROS_INFO("pose updated! x: %f, y: %f, theta: %.2f degrees", mCurrentPose.position.x, mCurrentPose.position.y, (mCurrentPose.orientation.z * 180 / M_PI));
 
         }
     } else {
@@ -167,7 +167,7 @@ int main(int argc, char **argv) {
     pubTraversedPath = n.advertise<nav_msgs::Path>("traversed_path", 32);
 
     //subs
-    ros::Subscriber subRelativePose = n_control.subscribe("odometry", 1024, subRelativePoseCallback);
+    ros::Subscriber subRelativePose = n_control.subscribe("odometry", 8, subRelativePoseCallback);
 
     //services
     servServerCurrentPose = n.advertiseService("current_pose", servServerCurrentPoseCallback);
