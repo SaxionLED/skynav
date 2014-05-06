@@ -15,6 +15,7 @@
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h> 
 #include <pcl/surface/concave_hull.h>
+#include <pcl/surface/convex_hull.h>
 
 
 
@@ -84,50 +85,6 @@ float truncateValue(const float value){
 	return floorf(value*1000)/1000; //mm
 	//return floorf(value*100)/100; //cm 
 }
-
-// 2D cross product of OA and OB vectors, i.e. z-component of their 3D cross product.
-// Returns a positive value, if OAB makes a counter-clockwise turn,
-// negative for clockwise turn, and zero if the points are collinear.
-double cross(const Point32 &O, const Point32 &A, const Point32 &B){
-	return (A.x - O.x) * (B.y - O.y) - (A.y - O.y) * (B.x - O.x);
-}
-
-//TODO Convex hull is not correct when encountering concave objects like walls!!
- 
-// Implementation of Andrew's monotone chain 2D convex hull algorithm.
-// Asymptotic complexity: O(n log n).
-// Returns a pointcloud containing a list of points on the convex hull in counter-clockwise order.
-// Note: the last point in the returned list is the same as the first one.
-//PointCloud convex_hull(PointCloud data){
-	//vector<Point32> P = data.points;
-	//PointCloud PC;
-	
-	//int n = P.size(), k = 0;
-	//vector<Point32> H(2*n);
- 
-	//// Sort points lexicographically
-	//sort(P.begin(), P.end(), compare);
- 
-	//// Build lower hull
-	//for (int i = 0; i < n; ++i) {
-		//while (k >= 2 && cross(H[k-2], H[k-1], P[i]) <= 0) k--;
-		//H[k++] = P[i];
-	//}
- 
-	//// Build upper hull
-	//for (int i = n-2, t = k+1; i >= 0; i--) {
-		//while (k >= t && cross(H[k-2], H[k-1], P[i]) <= 0) k--;
-		//H[k++] = P[i];
-	//}
- 
-	//H.resize(k);
-	//for(int i = 0; i<H.size(); ++i){
-		//PC.points.push_back(H.at(i));	
-	//}
-	//PC.header.stamp = ros::Time::now();
-    //PC.header.frame_id = "/map";
-	//return PC;
-//}
 
 PointCloud convex_hull(PointCloud data){
 	PointCloud PC;
