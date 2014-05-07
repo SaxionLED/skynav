@@ -7,8 +7,8 @@
 #include <ros/ros.h>
 #include "graph.h"
 #define std_maxconnect 10	//
-#define std_maxdist 50
-#define std_maxnodes 200
+#define std_maxdist 100
+#define std_maxnodes 400
 
 MapData::MapData(unsigned int xDimension, unsigned int yDimension, float resolution)
 {

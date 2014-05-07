@@ -246,7 +246,7 @@
           <bool>true</bool>
          </property>
          <property name="currentIndex">
-          <number>0</number>
+          <number>3</number>
          </property>
          <widget class="QWidget" name="info_tab">
           <attribute name="title">
@@ -549,14 +549,14 @@
              </property>
             </spacer>
            </item>
-           <item row="3" column="0">
+           <item row="4" column="0">
             <widget class="QPushButton" name="manualTargetButton">
              <property name="text">
               <string>SEND</string>
              </property>
             </widget>
            </item>
-           <item row="1" column="0">
+           <item row="2" column="0">
             <layout class="QHBoxLayout" name="horizontalLayout_5">
              <item>
               <widget class="QLineEdit" name="manualTarget_x_input">
@@ -614,7 +614,7 @@
              </item>
             </layout>
            </item>
-           <item row="4" column="0">
+           <item row="5" column="0">
             <spacer name="verticalSpacer_2">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
@@ -626,6 +626,13 @@
               </size>
              </property>
             </spacer>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>manual target input (in m):</string>
+             </property>
+            </widget>
            </item>
           </layout>
          </widget>
