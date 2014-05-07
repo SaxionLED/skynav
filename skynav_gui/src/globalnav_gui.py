@@ -18,6 +18,8 @@ import std_msgs.msg
 import nav_msgs.msg
 import geometry_msgs.msg
 from geometry_msgs.msg import Pose2D
+from geometry_msgs.msg import Pose
+from geometry_msgs.msg import PoseStamped
 from rosgraph_msgs.msg import Log
 from nav_msgs.msg import Path
 from skynav_msgs.msg import *
@@ -105,6 +107,7 @@ class GlobalNavGUI(QWidget):
 		#ROS publishers		
 		self.query_pub = rospy.Publisher('/globalnav/user_input_query',user_input_query)	
 		self.re_init_pub = rospy.Publisher('/globalnav/user_init',user_init)	
+		self.target_pub = rospy.Publisher('/globalnav/waypoints',Path)
 		
 		#ROS services
 		self.loadNewMap_srv = rospy.ServiceProxy('/globalnav/update_map_req',mapreader_srv)
@@ -118,11 +121,40 @@ class GlobalNavGUI(QWidget):
 		self._widget.fixedwps_update.clicked.connect(self.updateFixedWaypoints)
 		self._widget.fixedwps_add.clicked.connect(self.addRow)
 		self._widget.fixedwps_delete.clicked.connect(self.delRow)
+		self._widget.manualTargetButton.clicked.connect(self.sendManualTarget)
 
 		self._widget.save_button.clicked.connect(self.demoFunction)
+		
 
 	def resizeEvent(self,ev):
 		self._widget.graphicsView.fitInView(self.gScene.borderItem)
+	
+	
+	#output a manual target pose
+	def sendManualTarget(self):
+		xM = self._widget.manualTarget_x_input.text()
+		yM = self._widget.manualTarget_y_input.text()
+		thM = self._widget.manualTarget_th_input.text()
+		
+		if xM and yM:
+			pos = Pose()
+			pos.position.x = float(xM)
+			pos.position.y = float(yM)
+		if thM:
+			pos.orientation.z = float(thM)
+		else:
+			print "no viable target theta set, default"
+			pos.orientation.z = float(0)
+		
+		msg = Path()
+		target = PoseStamped()
+		target.header.frame_id = '/map'
+		target.header.stamp = rospy.Time.now()
+		target.pose = pos
+	
+		msg.poses.append(target)
+		
+		self.target_pub.publish(msg)
 		
 	#output a query request	
 	def sendQuery(self):
@@ -209,7 +241,8 @@ class GlobalNavGUI(QWidget):
 	
 	
 	def updatePathCallback(self,path):
-		self.sigPathUpdate.emit(path)
+		if hasattr(self, 'mapdata'):
+			self.sigPathUpdate.emit(path)
 		
 	#on receiving new path data, redraw the path
 	def updatePath(self,path):
@@ -349,7 +382,7 @@ class GlobalNavGUI(QWidget):
 		self._widget.debug_textbrowser.append(str(log.header.stamp.secs) + " : "+ log.name + " --  " + log.msg)
 		
 #-------------------------------------------------------------------------------------------------------------------------------------------------------
-	#load a 200x200 cm demo map and set the start and end coordinates automatically
+	#load a 400x400 cm demo map and set the start and end coordinates automatically
 	def demoFunction(self):
 		fileName = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../maps/testmap5.txt')
 		try:
@@ -372,8 +405,8 @@ class GlobalNavGUI(QWidget):
 		#demo coordinates
 		self._widget.start_x_input.setText("1")
 		self._widget.start_y_input.setText("1")
-		self._widget.target_x_input.setText("1")
-		self._widget.target_y_input.setText("198")
+		self._widget.target_x_input.setText("398")
+		self._widget.target_y_input.setText("398")
 		self._widget.start_th_input.setText("0")
 		self._widget.target_th_input.setText("180")
 
