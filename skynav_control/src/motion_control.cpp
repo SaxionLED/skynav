@@ -111,9 +111,9 @@ double calcDistance(Point a, Point b){
 
 void publishCmdVel(Twist twist)	{
 	
-	if(twist.linear.x > MAX_VELOCITY){
-		ROS_ERROR("Attempt to send higher than maximum velocity of %f. Changing to maximum: %f",twist.linear.x,MAX_VELOCITY);
-		twist.linear.x = MAX_VELOCITY;
+	if(twist.linear.x > MOTION_VELOCITY){
+		ROS_ERROR("Attempt to send cmdvel %f, which is higher than maximum intended velocity. Changing to intended velocity of: %f",twist.linear.x,MOTION_VELOCITY);
+		twist.linear.x = MOTION_VELOCITY;
 	}	
 	//publish to cmd_vel
 	pubCmdVel.publish(twist);
@@ -125,7 +125,7 @@ void publishCmdVel(Twist twist)	{
 void cmdVelTimeoutCallback(const ros::TimerEvent&) {
 
     mCmdVelTimeout.stop();
-    pubNavigationStateHelper(NAV_READY); //TODO naming is poor here
+    pubNavigationStateHelper(NAV_READY); 
     
     Twist twist_stop;
     pubCmdVel.publish(twist_stop);
@@ -264,7 +264,6 @@ void navigate() {
         break;
         case NAV_READY: 	//IDLE state if there is no path currently available
         {						
-			//ROS_WARN("NAV_READY");	
             if (!mCurrentPath->size() == 0){ 
 				ROS_WARN("NAV_READY");
 				
