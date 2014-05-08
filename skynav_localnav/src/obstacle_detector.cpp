@@ -13,7 +13,7 @@
 #include <tf/transform_listener.h>
 #include <skynav_msgs/Objects.h>
 
-#define SIMULATOR 						false 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
+#define MEMORY 						false 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
 #define ROBOTRADIUS 					0.5 	//the radius of the robot in meters. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 					4		//the outer range of the sensors in meters
 
@@ -122,7 +122,7 @@ void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {	//
             double objectY = (sin(alpha) * distance) + currentPose.position.y + rangeMsg.yOffsetFromCenter; // y
 
             Point32 p;
-            p.x = truncateValue(objectX); // truncate values to mm (because sonar and IR return very specific values that fall outside their precision)
+            p.x = truncateValue(objectX); 
             p.y = truncateValue(objectY);
 
             pointCloud.points.push_back(p);
@@ -276,7 +276,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
 
 //discard objects outside of certain range, or when a new scan has been done
 void forgetObjects(){
-	if(!SIMULATOR){	//if runs on actual robot, use only transient data from each laser scan. dont keep objects in memory
+	if(!MEMORY){	//if runs on actual robot, use only transient data from each laser scan. dont keep objects in memory
 		mObjects.clear();
 	}else{
 		try{
@@ -291,8 +291,7 @@ void forgetObjects(){
 				}
 				if((*objectIt).points.empty()){
 					mObjects.erase(objectIt--); //careful here!
-				}
-					
+				}					
 			}
 		}catch(exception& e){
 			ROS_ERROR("ERROR forgetting objects: %s",e.what());
@@ -354,8 +353,7 @@ int main(int argc, char **argv) {
 		
 		publishObjects();
 		
-		loop_rate.sleep();
-		
+		loop_rate.sleep();		
 	}
             
     delete mTransformListener;

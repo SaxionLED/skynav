@@ -8,7 +8,7 @@
 #include <std_msgs/UInt8.h>
 
 
-#define SIMULATOR 						true 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
+#define SIMULATOR 						true 	// set this to true when using the simulator, false indicates the actual robot with different laser is used
 
 using namespace sensor_msgs;
 using namespace geometry_msgs;
@@ -95,13 +95,14 @@ void subFilterLaserCallback(const LaserScan::ConstPtr& scan) {
 				continue;
 			}
 		}
+
 		//filter the outer edge of the laser range out of the results
 		if( scan->ranges.at(i) > (scan->range_max - 0.1) || scan->ranges.at(i) < scan->range_min)	{	
 			scan_filtered.ranges.push_back( 0 );	// add 0 if outside limit or it ruins the rest of the angles (relient on array size)
 			scan_filtered.intensities.push_back( 0 );
 			continue;
 		}
-
+		
 		scan_filtered.ranges.push_back( scan->ranges.at(i) );
 		scan_filtered.intensities.push_back( scan->intensities.at(i) );
 	}
@@ -122,19 +123,21 @@ int main(int argc, char **argv) {
     pubOdometry = n.advertise<geometry_msgs::Pose>("odometry", 32);
     pubSensors = n.advertise<skynav_msgs::RangeDefinedArray>("sensors", 1024);
     pubLaser = n.advertise<sensor_msgs::LaserScan>("laser_scan", 1024);    
-	pubLaserFiltered = n_robot.advertise<LaserScan>("laser/scan_filtered", 1000);
+	pubLaserFiltered = n_robot.advertise<LaserScan>("laser/scan_filtered", 1024);
 	
     //subs
     ros::Subscriber subSensors = n_robot.subscribe("sensors", 1024, subSensorsCallback);    
     ros::Subscriber subRelativePose = n_robot.subscribe("odometry", 32, subRelativePoseCallback);
-    ros::Subscriber subLaserRobot = n_robot.subscribe("laser/scan_filtered", 1000, subLaserScanCallback);	
-	ros::Subscriber subLaser = n_robot.subscribe("laser/scan", 1000, subFilterLaserCallback);	
+    ros::Subscriber subLaserRobot = n_robot.subscribe("laser/scan_filtered", 1024, subLaserScanCallback);	
+	ros::Subscriber subLaser = n_robot.subscribe("laser/scan", 1024, subFilterLaserCallback);	
 	ros::Subscriber	subNavigationState= n.subscribe("navigation_state",0,subNavigationStateCallback);
 
 	//services
     servClientCurrentPose = n_SLAM.serviceClient<skynav_msgs::current_pose>("current_pose");
     
+    
     ros::spin();
+	
 
     return 0;
 }
