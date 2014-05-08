@@ -17,6 +17,7 @@
 #include <pcl/surface/concave_hull.h>
 #include <pcl/surface/convex_hull.h>
 
+#include "local_planner_lib.h"
 
 
 #define ROBOTRADIUS 		0.5 	//the radius of the robot. TODO get this from somewhere robot dependent
@@ -73,11 +74,6 @@ Pose getCurrentPose() {
 		ROS_ERROR("exception caught: %s",e.what());
 		ros::shutdown();
 	}
-}
-
-//calculate distance between two point with use of pythagoras
-double calcDistance(Point a, Point b){
-	return sqrt(pow((a.x - b.x),2) + pow((a.y - b.y),2));
 }
 
 //truncate values (in meters) to certain precision
