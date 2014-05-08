@@ -25,29 +25,30 @@ void subGlobalPlannerWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 	nav_msgs::Path nwPath;
 	nwPath.header = msg->header;
 	vector<PoseStamped> nwWaypoints = msg->poses;
-	
-	for(int wp0 = 0, wp1 = 1; wp1<nwWaypoints.size(); ++wp0,++wp1){
-		srv.request.currentPos = nwWaypoints.at(wp0).pose.position;
-		srv.request.targetPos  = nwWaypoints.at(wp1).pose.position;
+	if(nwWaypoints.size()>1){
+		for(int wp0 = 0, wp1 = 1; wp1<nwWaypoints.size(); ++wp0,++wp1){
+			srv.request.currentPos = nwWaypoints.at(wp0).pose.position;
+			srv.request.targetPos  = nwWaypoints.at(wp1).pose.position;
 
-		if(servClientWaypointCheck.call(srv)){
-			if(srv.response.pathChanged){
-				changedPath=true;
-				vector<PoseStamped>::iterator pathIt = nwWaypoints.begin();	
+			if(servClientWaypointCheck.call(srv)){
+				if(srv.response.pathChanged){
+					changedPath=true;
+					vector<PoseStamped>::iterator pathIt = nwWaypoints.begin();	
 
-				PoseStamped ps;
-				ps.header.frame_id = "/map";
-				ps.header.stamp = ros::Time::now();				
-				ps.pose.position = srv.response.newPos;
-				
-				//insert new waypoint into the list of waypoints
-				nwWaypoints.insert(pathIt+(wp0+1),ps);		 		
-			}
-		}else{
-			ROS_ERROR("Failed to call waypoint check service from waypoint_filter.?");
-			return;
-			//ros::shutdown();
-		}						 
+					PoseStamped ps;
+					ps.header.frame_id = "/map";
+					ps.header.stamp = ros::Time::now();				
+					ps.pose.position = srv.response.newPos;
+					
+					//insert new waypoint into the list of waypoints
+					nwWaypoints.insert(pathIt+(wp0+1),ps);		 		
+				}
+			}else{
+				ROS_ERROR("Failed to call waypoint check service from waypoint_filter.?");
+				return;
+				//ros::shutdown();
+			}						 
+		}
 	}
 	if(changedPath){
 		nwPath.poses = nwWaypoints;
@@ -68,59 +69,24 @@ void placeholderGlobalPlannerWaypoints() {
 
     path.header.frame_id = "/map";
     path.header.stamp = ros::Time::now();
-
-    double rectSize = 2;
-
+    
     PoseStamped ps;
     ps.header.frame_id = "/map";
     ps.header.stamp = ros::Time::now();
 
-     //start pose, has orientation (should be the same as robots physical orientation)
-    {
+     //start pose, has orientation 
+	{
         ps.pose.position.x = 0;
         ps.pose.position.y = 0;
         path.poses.push_back(ps);
     }
-	//for(int i = 0; i<5;++i){
-		//{ // no orientation needed
-			//ps.pose.position.x = 0;
-			//ps.pose.position.y = rectSize;
-			//path.poses.push_back(ps);
-		//}
-
-		//{ // no orientation needed
-			//ps.pose.position.x = rectSize;
-			//ps.pose.position.y = rectSize;
-			//path.poses.push_back(ps);
-		//}
-
-		//{ // no orientation needed
-			//ps.pose.position.x = rectSize;
-			//ps.pose.position.y = -rectSize;
-			//path.poses.push_back(ps);
-		//}
-		
-		//{ // no orientation needed
-			//ps.pose.position.x = -rectSize;
-			//ps.pose.position.y = -rectSize;
-			//path.poses.push_back(ps);
-		//}
-			
-		//{ // no orientation needed
-			//ps.pose.position.x = -rectSize;
-			//ps.pose.position.y = rectSize;
-			//path.poses.push_back(ps);
-		//}
-	//}
-   
     { // end pose, needs orientation
-        ps.pose.position.x = 5;
+        ps.pose.position.x = 0;
         ps.pose.position.y = 0;
         ps.pose.orientation.z = M_PI;   //180 deg
         path.poses.push_back(ps);
     }
 
-    //pubWaypoints.publish(path);
     pubDummyPath.publish(path); //publish dummy path data on waypoints topic
 }
 
@@ -138,24 +104,18 @@ int main(int argc, char **argv) {
 	pubDummyPath = n_globalnav.advertise<nav_msgs::Path>("waypoints", 32);
 
     //subs
-    ros::Subscriber subNavigationState = n.subscribe("navigation_state", 0, subNavigationStateCallback);
+    //ros::Subscriber subNavigationState = n.subscribe("navigation_state", 0, subNavigationStateCallback);
     ros::Subscriber subGlobalPlannerWaypoints = n_globalnav.subscribe("waypoints", 32, subGlobalPlannerWaypointsCallback);
 
     //service
     servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
 
-    ros::Rate loop_rate(1);    
-    
-	ros::Duration(15).sleep();
+   	//ros::Duration(15).sleep();
       
-	placeholderGlobalPlannerWaypoints();
+	//placeholderGlobalPlannerWaypoints();
 	
-    loop_rate.sleep();
-    
-    ros::spin();
+	ros::spin();
 	
-
-
     return 0;
 }
 

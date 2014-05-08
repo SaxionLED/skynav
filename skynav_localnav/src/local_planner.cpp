@@ -132,7 +132,7 @@ PointCloud concave_hull(PointCloud data){
 	return PC;
 }
 
-//function to call convex hull determination for each object
+//function to call outline determination for each object
 void hullFunction(){	
 	mObjectOutlines.clear();	//clear the outlines and replace with new data
 	
@@ -382,7 +382,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	}
 	
 	//Hack calculate the point further along the same angle, for colission detection when the object is wider than known at the moment
-	distNewP = distNewP+0.5;
+	distNewP = distNewP+0.2;
 	
 	//VII calculate x and y coordinates of the new waypoint, based on distance and angle from current pos
 	nwTarget.x = truncateValue(	currentPos.x + cos(angleNewP) * distNewP	);
@@ -481,7 +481,6 @@ optionPoint waypointCheck(Point pPath1, Point pPath2, bool recursiveBugNeeded){
 		return optionPoint(relColission); //return true with colissionpoint		
 	}
 	//no colissions found
-	//ROS_INFO("No collisions found on current track");
 	return optionPoint();  //return false 
 }
 
@@ -492,14 +491,13 @@ optionPoint waypointCheck(Point pPath1, Point pPath2, bool recursiveBugNeeded){
 // and return a new coordinate for the reroute and and return true 	// TODO margin, eg robot size
 bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
 
-	hullFunction();	//Only call convex hull when asking for colission. TODO replace with concave hull function!?
+	hullFunction();	//Only call when asking for colission.
 	
 	if(mObjectOutlines.empty()){
-		//ROS_INFO("No objects to check");
 		resp.pathChanged = 0;
-		return true;	//if there are no objects currently known, dont calculate anything and return
+		return true;	//dont calculate anything and return
 	}
-	//call the colissioncheck algorithm. if colissioncheck is true, new waypoint is returned, else there is no colission	
+	//if colissioncheck is true, new waypoint is returned, else there is no colission	
 	optionPoint newPoint;
 	if((newPoint = waypointCheck(req.currentPos, req.targetPos, true))){		//call for colissioncheck with recursiveBug active
 		resp.pathChanged = 1;
@@ -522,7 +520,7 @@ void interruptNavigationState(const std_msgs::UInt8 pubmsg){
 // call colissioncheck function. if colission occurs, publish interrupt navigationstate for motion_control 
 void collisionCheck(){
 	
-	hullFunction();	//Only call convex hull when asking for colissioncheck. 
+	hullFunction();	//Only call when asking for colissioncheck. 
 	
 	if(mObjectOutlines.empty()){
 		return;				// dont calculate anything and return
