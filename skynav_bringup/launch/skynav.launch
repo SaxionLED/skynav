@@ -1,8 +1,4 @@
 <launch>
-	<group ns="gui">
-		<node pkg="skynav_gui" name="skynav_gui" type="skynav_gui.py" required="true" output="screen"/>	
-	</group>
-	
 	<param name="robot_description" command="$(find xacro)/xacro.py '$(find x80sv_description)/urdf/x80sv.xacro'" />
 
 	<group ns="x80sv">
@@ -36,6 +32,9 @@
 		<node pkg="skynav_localnav" name="local_planner" type="local_planner" output="screen"/>
 	</group>
 	
-	<node pkg="rviz" name="rviz" type="rviz" required="true"/>
+	<group ns="gui">
+	<node pkg="rviz" name="rviz" type="rviz" required="true"/>	
+	<node pkg="skynav_gui" name="skynav_gui" type="skynav_gui.py" required="true" output="screen"/>	
+	</group>
 	
 </launch>
