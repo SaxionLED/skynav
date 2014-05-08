@@ -13,6 +13,7 @@
 	<build_depend>laser_geometry</build_depend>
 	<build_depend>tf</build_depend>
 	<build_depend>pcl_ros</build_depend>
+	<build_depend>rostest</build_depend>
 
 
 	
