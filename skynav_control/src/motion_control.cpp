@@ -22,7 +22,7 @@
 #define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
 #define ROBOT_WAYPOINT_ACCURACY         true                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
-#define CONSECUTIVE_PATHS				true					//if true, each received path will be added to the current path. if false, current path is erased, and new path is the new way to go
+#define CONSECUTIVE_PATHS				false					//if true, each received path will be added to the current path. if false, current path is erased, and new path is the new way to go
 
 enum NAVIGATION_STATE { 			//TODO move this into a shared container (skynav_msgs perhaps?)
     NAV_READY = 0,					//check for new path recieved
@@ -182,7 +182,6 @@ Twist getCurrentVelocity() {
 		if (servClientCurrentVelocity.call(velService)) {
 
 			currentVelocity = velService.response.velocity;
-
 		} else {
 			ROS_ERROR("Failed to call current_velocity service from motion control");
 			ros::shutdown();
@@ -541,15 +540,17 @@ void navigate() {
 			ROS_WARN("NAV_STOP");
 			double currentVelocity = getCurrentVelocity().linear.x;
 			Twist twist_stop;
-			Twist twist;
-			   ros::Rate rate(5); // each 200ms
+			if(abs(currentVelocity) > 0.25*MOTION_VELOCITY){
+				Twist twist;
+				   ros::Rate rate(5); // each 200ms
 
-			for(double s = currentVelocity; s >= currentVelocity / 16; s /= 2)	{
+				for(double s = currentVelocity; s >= currentVelocity / 16; s /= 2)	{
 
-				twist.linear.x = s;							
-				publishCmdVel(twist);
-				
-				rate.sleep();
+					twist.linear.x = s;							
+					publishCmdVel(twist);
+					
+					rate.sleep();
+				}
 			}						
 			publishCmdVel(twist_stop);			
 			
