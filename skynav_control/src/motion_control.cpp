@@ -21,7 +21,8 @@
 #define ANGLE_ERROR_ALLOWED             M_PI / 180 * 1          // rads	// second stage angle check for precision // if too small, the robot may rotate infinitely
 #define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
-#define ROBOT_WAYPOINT_ACCURACY         false                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
+#define ROBOT_WAYPOINT_ACCURACY         true                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
+#define CONSECUTIVE_PATHS				true					//if true, each received path will be added to the current path. if false, current path is erased, and new path is the new way to go
 
 enum NAVIGATION_STATE { 			//TODO move this into a shared container (skynav_msgs perhaps?)
     NAV_READY = 0,					//check for new path recieved
@@ -58,21 +59,16 @@ list<PoseStamped>* mCurrentPath = new list<PoseStamped>;
 list<PoseStamped>* mOriginalPath = new list<PoseStamped>;
 double mEndOrientation = 0;
 
+bool path_init=false;	//boolean if there is a current path initiated
+
 ros::Timer mCmdVelTimeout;
 uint8_t mNavigationState = NAV_READY; 	// initial navigation_state
 uint8_t mMovementState = MOV_READY;		// initial movement_state
 
-void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
-
-    mCurrentPath = new list<PoseStamped>(msg->poses.begin(), msg->poses.end());
-	mOriginalPath = new list<PoseStamped>(msg->poses.begin(), msg->poses.end());
-    mEndOrientation = mOriginalPath->back().pose.orientation.z;
-
-    ROS_INFO("path received by motion control");
-}
 
 //callback to change navigationstate on an interrupt from outside
 void subNavigationStateInterruptCallback(const std_msgs::UInt8::ConstPtr& msg) {
+	
 	mNavigationState = msg->data;
 	ROS_WARN("nav_state interrupted, changed to (%u)", msg->data);
     pubNavigationState.publish(msg);
@@ -81,7 +77,7 @@ void subNavigationStateInterruptCallback(const std_msgs::UInt8::ConstPtr& msg) {
 
 //function to change navigationstate from within this node, and publish current state to the outside
 void pubNavigationStateHelper(NAVIGATION_STATE state) {
-
+	
     // set the local state to ensure there is no delay
     mNavigationState = state;
 
@@ -91,28 +87,49 @@ void pubNavigationStateHelper(NAVIGATION_STATE state) {
     //ROS_INFO("nav state function changed to %u", state);
 }
 
-void setMovementState(MOVEMENT_STATE moveState) {
+void clearPath() {
+	
+    mCurrentPath->clear(); // clear the path
+    mOriginalPath->clear();
+    path_init = false;
+}
 
+void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {	
+	
+	ROS_INFO("path received by motion control");
+
+	if(CONSECUTIVE_PATHS && path_init){
+		mCurrentPath->insert(mCurrentPath->end(), msg->poses.begin(), msg->poses.end());
+		mOriginalPath->insert(mOriginalPath->end(), msg->poses.begin(), msg->poses.end());
+		mEndOrientation = mOriginalPath->back().pose.orientation.z;
+		return;
+	} else {	
+		pubNavigationStateHelper(NAV_STOP);	
+	}
+	
+	mCurrentPath = new list<PoseStamped>(msg->poses.begin(), msg->poses.end());
+	mOriginalPath = new list<PoseStamped>(msg->poses.begin(), msg->poses.end());
+	mEndOrientation = mOriginalPath->back().pose.orientation.z;
+	path_init = true;
+}
+
+void setMovementState(MOVEMENT_STATE moveState) {
+	
     // set the local state to ensure there is no delay
     mMovementState = moveState;
     //ROS_INFO("mov_state changed to %u", moveState);
 }
 
-void clearPath() {
-
-    mCurrentPath->clear(); // clear the path
-    mOriginalPath->clear();
-}
-
 //calculate distance between two point with use of pythagoras
 double calcDistance(Point a, Point b){
+	
 	return sqrt(pow((a.x - b.x),2) + pow((a.y - b.y),2));
 }
 
-void publishCmdVel(Twist twist)	{
+void publishCmdVel(Twist twist)	{	
 	
 	if(twist.linear.x > MOTION_VELOCITY){
-		ROS_ERROR("Attempt to send cmdvel %f, which is higher than maximum intended velocity. Changing to intended velocity of: %f",twist.linear.x,MOTION_VELOCITY);
+		ROS_ERROR("Attempt to send cmdvel %f, which is higher than max intended velocity. sending max intended velocity of: %f",twist.linear.x,MOTION_VELOCITY);
 		twist.linear.x = MOTION_VELOCITY;
 	}	
 	//publish to cmd_vel
@@ -123,7 +140,7 @@ void publishCmdVel(Twist twist)	{
 }
 
 void cmdVelTimeoutCallback(const ros::TimerEvent&) {
-
+	
     mCmdVelTimeout.stop();
     pubNavigationStateHelper(NAV_READY); 
     
@@ -134,6 +151,7 @@ void cmdVelTimeoutCallback(const ros::TimerEvent&) {
 }
 
 Pose getCurrentPose() {
+	
 	try{
 		Pose currentPose;
 
@@ -155,6 +173,7 @@ Pose getCurrentPose() {
 }
 
 Twist getCurrentVelocity() {
+	
 	try{
 		Twist currentVelocity;
 
@@ -176,22 +195,11 @@ Twist getCurrentVelocity() {
 }
 
 bool posesEqual(Pose currentPose, Pose targetPose) {
-
+	
     if (calcDistance(targetPose.position,currentPose.position)< DISTANCE_ERROR_ALLOWED) {
         return true;
     }
     return false;
-}
-
-double calcShortestTurn(double a1, double a2) {
-
-    double dif = (a1 - a2); // calc shortest turn
-    if (dif > M_PI)
-        dif -= (M_PI * 2);
-    if (dif < -M_PI)
-        dif += (M_PI * 2);
-
-    return dif;
 }
 
 //semi depricated function as this is integrated into nav_moving state
@@ -251,8 +259,7 @@ void navigate() {
                     if (posesEqual(currentPose, mCurrentPath->front().pose)) { // if within error value of target
                         mCurrentPath->pop_front();
                     }else{
-						ROS_ERROR("target not quite reached; compensating");
-						ros::Rate(5).sleep();
+						ROS_ERROR("target not quite reached; compensating");						
 					}
                 } else {
 				    ROS_INFO("nav pose reached unchecked, continue"); 
@@ -262,7 +269,7 @@ void navigate() {
 			pubNavigationStateHelper(NAV_READY);
         }
         break;
-        case NAV_READY: 	//IDLE state if there is no path currently available
+        case NAV_READY: 	
         {						
             if (!mCurrentPath->size() == 0){ 
 				ROS_WARN("NAV_READY");
@@ -319,7 +326,7 @@ void navigate() {
 						if (posesEqual(currentPose, absoluteTargetPose.pose)) {
 							ROS_INFO("already at target pose, skipping");
 							pubNavigationStateHelper(NAV_POSE_REACHED);
-							break; // need to go to the new case before going back into this case
+							break;
 						}
 
 						theta =  atan2(absoluteTargetPose.pose.position.y - currentPose.position.y, absoluteTargetPose.pose.position.x - currentPose.position.x); // calc turn towards next point
@@ -340,7 +347,7 @@ void navigate() {
 							publishCmdVel(twist);
 							in_motion = true;
 						}						
-
+						//method for turning more precise. first turn a rough angle, then turn the remaining, on a slower rate
 						//turn rough angle
 						if(!(currentPose.orientation.z < theta + ANGLE_ERROR_FIRST && currentPose.orientation.z > theta - ANGLE_ERROR_FIRST))	{
 							//do nothing, continue turning
@@ -383,7 +390,7 @@ void navigate() {
 					{
 						ROS_INFO("mov_accel");
 
-						//relative target pose is a point on the relative x-axle of the robot.
+						//relative target pose is a point along the relative x of the robot.
 						relativeTargetPose.position.x = calcDistance(absoluteTargetPose.pose.position, currentPose.position);
 						relativeTargetPose.position.y = 0;				
 						
@@ -423,7 +430,6 @@ void navigate() {
 						double dist_traversed = relativeTargetPose.position.x - (calcDistance(currentPose.position,originalPose.position));
 						if(dist_traversed > breakDist){
 							//do nothing, continue moving	
-							//ROS_INFO("curVelocity %f",currentVelocity.linear.x);
 
 						}else{
 							steadyVelocity = currentVelocity.linear.x;
@@ -451,7 +457,7 @@ void navigate() {
 					case MOV_REACHED:
 					{
 						ROS_INFO("mov_reached");
-						pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose is reached within error values
+						pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose should be reached within error values
 					}
 					break;		
 					default:
@@ -471,7 +477,7 @@ void navigate() {
 			ROS_WARN("NAV_OBSTACLE_DETECTED");	
 			Twist twist_stop;	
 			float curVel = getCurrentVelocity().linear.x;
-			if(abs(curVel) > 0.05){
+			if(abs(curVel) > 0.25*MOTION_VELOCITY){
 				ROS_INFO("current velocity is: %f ,breaking", curVel);
 				double rateHz = 0.2;
 				ros::Rate rate(1 / rateHz);
@@ -527,7 +533,7 @@ void navigate() {
         {
 			ROS_WARN("NAV_ERROR");
             clearPath();
-            
+            pubNavigationStateHelper(NAV_STOP);            
         }
         break;
         case NAV_STOP:
@@ -545,13 +551,9 @@ void navigate() {
 				
 				rate.sleep();
 			}						
-			publishCmdVel(twist_stop);
+			publishCmdVel(twist_stop);			
 			
-			clearPath();
-			
-			pubNavigationStateHelper(NAV_READY);
-
-            
+			pubNavigationStateHelper(NAV_READY);            
         }
         break;
         default:
@@ -587,8 +589,6 @@ int main(int argc, char **argv) {
 
     // hz
     ros::Rate loop_rate(10); // loop every 100ms
-
-	ros::Duration(1).sleep();
 
     while (ros::ok()) {
 
