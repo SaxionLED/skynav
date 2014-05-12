@@ -13,7 +13,7 @@
 #include <tf/transform_listener.h>
 #include <skynav_msgs/Objects.h>
 
-#define MEMORY 						false 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
+#define MEMORY 							false 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
 #define ROBOTRADIUS 					0.5 	//the radius of the robot in meters. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 					4		//the outer range of the sensors in meters
 
@@ -301,22 +301,14 @@ void forgetObjects(){
 
 //publish all known objects
 void publishObjects()	{
-		
-	//ROS_INFO("%d objects", mObjects.size());
-	vector<PointCloud> obstacles;
-	vector<PointCloud>::iterator it;
-		
-	for(it = mObjects.begin(); it != mObjects.end(); ++it)	{
-		
-		//(*it).header.stamp = ros::Time::now();
-		//ROS_INFO("contains %d", (*it).points.size());
-		pubObjects.publish( (*it) );
-		
-		obstacles.push_back((*it));
-	}
+	
 	skynav_msgs::Objects msg;
-	msg.objects = obstacles;
+	msg.objects = mObjects;
 	pubObstacles.publish(msg);
+	
+	for(vector<PointCloud>::iterator it = mObjects.begin(); it != mObjects.end(); ++it)	{
+		pubObjects.publish( (*it) );
+	}
 	
 	forgetObjects();	
 
