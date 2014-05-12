@@ -8,7 +8,7 @@
 #include <std_msgs/UInt8.h>
 
 
-#define SIMULATOR 						true 	// set this to true when using the simulator, false indicates the actual robot with different laser is used
+#define SIMULATOR 						true 	// set this to true when using the simulator, false indicates the actual robot with different laser settings is used //TODO make this dependend on something
 
 using namespace sensor_msgs;
 using namespace geometry_msgs;
@@ -82,14 +82,16 @@ void subFilterLaserCallback(const LaserScan::ConstPtr& scan) {
 			//limit the laser angle on the actual robot so the robot itself wont be seen as object.
 			//the lds has been mounted with a 90 degree offset relative to the robot.. which results in the 0 degree (front) of the robot being at the 270 degree of the lds output
 			
-			if(mControl_NavigationState == 2 || mControl_NavigationState == 6){
-				lLimit = 180; //cap the laser so the robot only sees 180Degree in front of itself
-				hLimit = 360;
-			}else{	
-				lLimit = 225; //cap the laser to a 90 degree wide beam in front of the robot
-				hLimit = 315;
-			}
-			if(i<lLimit || i>hLimit){				//if(i>30 && i<150){	//cap the laser so the robot wont see itself
+			//if(mControl_NavigationState == 2 || mControl_NavigationState == 6){
+				//lLimit = 180; //cap the laser so the robot only sees 180Degree in front of itself
+				//hLimit = 360;
+			//}else{	
+				//lLimit = 225; //cap the laser to a 90 degree wide beam in front of the robot
+				//hLimit = 315;
+			//}
+			//if(i<lLimit || i>hLimit){	
+							
+			if(i>30 && i<150){	//cap the laser so the robot wont see itself
 				scan_filtered.ranges.push_back( 0 );	// add 0 if outside limit or it ruins the rest of the angles (relient on array size)
 				scan_filtered.intensities.push_back( 0 );
 				continue;
@@ -123,12 +125,12 @@ int main(int argc, char **argv) {
     pubOdometry = n.advertise<geometry_msgs::Pose>("odometry", 32);
     pubSensors = n.advertise<skynav_msgs::RangeDefinedArray>("sensors", 1024);
     pubLaser = n.advertise<sensor_msgs::LaserScan>("laser_scan", 1024);    
-	pubLaserFiltered = n_robot.advertise<LaserScan>("laser/scan_filtered", 1024);
+	pubLaserFiltered = n.advertise<LaserScan>("laser/scan_filtered", 1024);
 	
     //subs
     ros::Subscriber subSensors = n_robot.subscribe("sensors", 1024, subSensorsCallback);    
     ros::Subscriber subRelativePose = n_robot.subscribe("odometry", 32, subRelativePoseCallback);
-    ros::Subscriber subLaserRobot = n_robot.subscribe("laser/scan_filtered", 1024, subLaserScanCallback);	
+    ros::Subscriber subLaserRobot = n.subscribe("laser/scan_filtered", 1024, subLaserScanCallback);	
 	ros::Subscriber subLaser = n_robot.subscribe("laser/scan", 1024, subFilterLaserCallback);	
 	ros::Subscriber	subNavigationState= n.subscribe("navigation_state",0,subNavigationStateCallback);
 
