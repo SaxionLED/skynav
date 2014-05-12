@@ -122,6 +122,7 @@ class GlobalNavGUI(QWidget):
 		self._widget.fixedwps_add.clicked.connect(self.addRow)
 		self._widget.fixedwps_delete.clicked.connect(self.delRow)
 		self._widget.manualTargetButton.clicked.connect(self.sendManualTarget)
+		self._widget.meters_toggle.clicked.connect(self.toggleMeters)
 
 		self._widget.save_button.clicked.connect(self.demoFunction)
 		
@@ -135,15 +136,17 @@ class GlobalNavGUI(QWidget):
 		xM = self._widget.manualTarget_x_input.text()
 		yM = self._widget.manualTarget_y_input.text()
 		thM = self._widget.manualTarget_th_input.text()
-		
+		pos = Pose()
 		if xM and yM:
-			pos = Pose()
 			pos.position.x = float(xM)
 			pos.position.y = float(yM)
+		else:
+			pos.position.x = float(0)
+			pos.position.y = float(0)
 		if thM:
 			pos.orientation.z = float(thM)
 		else:
-			print "no viable target theta set, default"
+			#print "no viable target theta set, default"
 			pos.orientation.z = float(0)
 		
 		msg = Path()
@@ -164,6 +167,13 @@ class GlobalNavGUI(QWidget):
 		xT = self._widget.target_x_input.text()
 		yT = self._widget.target_y_input.text()
 		thT = self._widget.target_th_input.text()
+		
+		if self._widget.meters_toggle.isChecked():
+			xS = float(xS)*100
+			yS = float(yS)*100
+			xT = float(xT)*100
+			yT = float(yT)*100
+			
 		if xS and yS and xT and yT:
 			start= Pose2D()
 			target=Pose2D()
@@ -177,20 +187,20 @@ class GlobalNavGUI(QWidget):
 			if thS:
 				start.theta = float(thS)
 			else:	 
-				print "no viable Start theta set, default"
+				#print "no viable Start theta set, default"
 				self._widget.start_th_input.setText("0")
 				target.theta = float(0)
 				
 			if thT:
 				target.theta = float(thT)
 			else:
-				print "no viable Target theta set, default"
+				#print "no viable Target theta set, default"
 				self._widget.target_th_input.setText("0")
 				target.theta = float(0)
 					
 			try:
 				ret = self.getPath_query_srv(1,start,target)
-				self._widget.info_textbox.append("Path from ("+ xS+","+yS+") to ("+xT+","+yT+")")			
+				self._widget.info_textbox.append("Path from ("+ str(xS)+","+str(yS)+") to ("+str(xT)+","+str(yT)+")")			
 			except rospy.ServiceException, e:
 				self._widget.info_textbox.append("Error with query")
 				self._widget.debug_textbrowser.append("Service call failed: %s"%e)
@@ -380,7 +390,15 @@ class GlobalNavGUI(QWidget):
 	#write debug information into the debug screen
 	def debugOutput(self, log):
 		self._widget.debug_textbrowser.append(str(log.header.stamp.secs) + " : "+ log.name + " --  " + log.msg)
-		
+	
+	def toggleMeters(self):
+		if self._widget.meters_toggle.isChecked():
+			self._widget.meters_label.setText("Meters")
+		else:
+			self._widget.meters_label.setText("Gridcells")
+	
+
+
 #-------------------------------------------------------------------------------------------------------------------------------------------------------
 	#load a 400x400 cm demo map and set the start and end coordinates automatically
 	def demoFunction(self):

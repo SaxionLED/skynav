@@ -32,8 +32,8 @@
         <height>0</height>
        </size>
       </property>
-      <layout class="QGridLayout" name="gridLayout_2">
-       <item row="0" column="0">
+      <layout class="QVBoxLayout" name="verticalLayout_6">
+       <item>
         <layout class="QHBoxLayout" name="horizontalLayout_4">
          <item>
           <widget class="QPushButton" name="save_button">
@@ -66,181 +66,7 @@
          </item>
         </layout>
        </item>
-       <item row="2" column="0">
-        <widget class="QWidget" name="navigationcontrol_widget" native="true">
-         <layout class="QVBoxLayout" name="verticalLayout_12">
-          <item>
-           <widget class="QLabel" name="navigation_label">
-            <property name="text">
-             <string>Navigation planner</string>
-            </property>
-            <property name="alignment">
-             <set>Qt::AlignCenter</set>
-            </property>
-            <property name="wordWrap">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QComboBox" name="start_searcher">
-            <property name="enabled">
-             <bool>true</bool>
-            </property>
-            <property name="statusTip">
-             <string>choose start point from user defined waypoints</string>
-            </property>
-            <property name="currentIndex">
-             <number>-1</number>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_1">
-            <item>
-             <widget class="QLineEdit" name="start_x_input">
-              <property name="toolTip">
-               <string/>
-              </property>
-              <property name="statusTip">
-               <string>x coordinate of start position</string>
-              </property>
-              <property name="inputMethodHints">
-               <set>Qt::ImhDigitsOnly</set>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="placeholderText">
-               <string>X</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="start_y_input">
-              <property name="toolTip">
-               <string/>
-              </property>
-              <property name="statusTip">
-               <string>y coordinate of start position</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="placeholderText">
-               <string>Y</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="start_th_input">
-              <property name="enabled">
-               <bool>true</bool>
-              </property>
-              <property name="toolTip">
-               <string/>
-              </property>
-              <property name="statusTip">
-               <string>angle of the start position with respect to the absolute environment map, in degrees</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="placeholderText">
-               <string>Angle</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="QComboBox" name="target_searcher">
-            <property name="enabled">
-             <bool>true</bool>
-            </property>
-            <property name="statusTip">
-             <string>choose target point from user defined waypoints</string>
-            </property>
-            <property name="currentIndex">
-             <number>-1</number>
-            </property>
-            <property name="maxVisibleItems">
-             <number>10</number>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="horizontalLayout_2">
-            <item>
-             <widget class="QLineEdit" name="target_x_input">
-              <property name="toolTip">
-               <string/>
-              </property>
-              <property name="statusTip">
-               <string>x coordinate of the target</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="placeholderText">
-               <string>X</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="target_y_input">
-              <property name="toolTip">
-               <string/>
-              </property>
-              <property name="statusTip">
-               <string>y coordinate of the target</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="placeholderText">
-               <string>Y</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLineEdit" name="target_th_input">
-              <property name="enabled">
-               <bool>true</bool>
-              </property>
-              <property name="toolTip">
-               <string/>
-              </property>
-              <property name="statusTip">
-               <string>angle of the target position with respect to the absolute environment map, in degrees</string>
-              </property>
-              <property name="text">
-               <string/>
-              </property>
-              <property name="placeholderText">
-               <string>Angle</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-         </layout>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QPushButton" name="GO_button">
-         <property name="toolTip">
-          <string/>
-         </property>
-         <property name="statusTip">
-          <string>run a query based on input above</string>
-         </property>
-         <property name="text">
-          <string>GO</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
+       <item>
         <widget class="QTabWidget" name="navplannerinfo_widget">
          <property name="enabled">
           <bool>true</bool>
@@ -536,26 +362,6 @@
            <string>manualTarget</string>
           </attribute>
           <layout class="QGridLayout" name="gridLayout_3">
-           <item row="0" column="0">
-            <spacer name="verticalSpacer">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>40</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item row="4" column="0">
-            <widget class="QPushButton" name="manualTargetButton">
-             <property name="text">
-              <string>SEND</string>
-             </property>
-            </widget>
-           </item>
            <item row="2" column="0">
             <layout class="QHBoxLayout" name="horizontalLayout_5">
              <item>
@@ -614,8 +420,8 @@
              </item>
             </layout>
            </item>
-           <item row="5" column="0">
-            <spacer name="verticalSpacer_2">
+           <item row="0" column="0">
+            <spacer name="verticalSpacer">
              <property name="orientation">
               <enum>Qt::Vertical</enum>
              </property>
@@ -634,8 +440,223 @@
              </property>
             </widget>
            </item>
+           <item row="4" column="0">
+            <widget class="QPushButton" name="manualTargetButton">
+             <property name="text">
+              <string>SEND</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <spacer name="verticalSpacer_2">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
           </layout>
          </widget>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="navigationcontrol_widget" native="true">
+         <layout class="QVBoxLayout" name="verticalLayout_12">
+          <item>
+           <widget class="QLabel" name="navigation_label">
+            <property name="text">
+             <string>Navigation planner</string>
+            </property>
+            <property name="alignment">
+             <set>Qt::AlignCenter</set>
+            </property>
+            <property name="wordWrap">
+             <bool>true</bool>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QFormLayout" name="formLayout">
+            <item row="0" column="0">
+             <widget class="QRadioButton" name="meters_toggle">
+              <property name="text">
+               <string/>
+              </property>
+              <property name="checked">
+               <bool>true</bool>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="1">
+             <widget class="QLabel" name="meters_label">
+              <property name="text">
+               <string>in meters</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QComboBox" name="start_searcher">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="statusTip">
+             <string>choose start point from user defined waypoints</string>
+            </property>
+            <property name="currentIndex">
+             <number>-1</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_1">
+            <item>
+             <widget class="QLineEdit" name="start_x_input">
+              <property name="toolTip">
+               <string/>
+              </property>
+              <property name="statusTip">
+               <string>x coordinate of start position</string>
+              </property>
+              <property name="inputMethodHints">
+               <set>Qt::ImhDigitsOnly</set>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="placeholderText">
+               <string>X</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="start_y_input">
+              <property name="toolTip">
+               <string/>
+              </property>
+              <property name="statusTip">
+               <string>y coordinate of start position</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="placeholderText">
+               <string>Y</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="start_th_input">
+              <property name="enabled">
+               <bool>true</bool>
+              </property>
+              <property name="toolTip">
+               <string/>
+              </property>
+              <property name="statusTip">
+               <string>angle of the start position with respect to the absolute environment map, in degrees</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="placeholderText">
+               <string>Angle</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <widget class="QComboBox" name="target_searcher">
+            <property name="enabled">
+             <bool>true</bool>
+            </property>
+            <property name="statusTip">
+             <string>choose target point from user defined waypoints</string>
+            </property>
+            <property name="currentIndex">
+             <number>-1</number>
+            </property>
+            <property name="maxVisibleItems">
+             <number>10</number>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="horizontalLayout_2">
+            <item>
+             <widget class="QLineEdit" name="target_x_input">
+              <property name="toolTip">
+               <string/>
+              </property>
+              <property name="statusTip">
+               <string>x coordinate of the target</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="placeholderText">
+               <string>X</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="target_y_input">
+              <property name="toolTip">
+               <string/>
+              </property>
+              <property name="statusTip">
+               <string>y coordinate of the target</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="placeholderText">
+               <string>Y</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLineEdit" name="target_th_input">
+              <property name="enabled">
+               <bool>true</bool>
+              </property>
+              <property name="toolTip">
+               <string/>
+              </property>
+              <property name="statusTip">
+               <string>angle of the target position with respect to the absolute environment map, in degrees</string>
+              </property>
+              <property name="text">
+               <string/>
+              </property>
+              <property name="placeholderText">
+               <string>Angle</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="GO_button">
+         <property name="toolTip">
+          <string/>
+         </property>
+         <property name="statusTip">
+          <string>run a query based on input above</string>
+         </property>
+         <property name="text">
+          <string>GO</string>
+         </property>
         </widget>
        </item>
       </layout>
@@ -651,7 +672,7 @@
        <enum>QTabWidget::Rounded</enum>
       </property>
       <property name="currentIndex">
-       <number>0</number>
+       <number>2</number>
       </property>
       <widget class="QWidget" name="Map_tab">
        <attribute name="title">
