@@ -20,7 +20,7 @@
 #include "local_planner_lib.h"
 
 
-#define ROBOTRADIUS 		0.5 	//the radius of the robot. TODO get this from somewhere robot dependent
+#define ROBOTRADIUS 		1 	//the radius of the robot. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 		4		//the outer range of the sensors
 
 using namespace geometry_msgs;
@@ -338,7 +338,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	}
 	
 	//calculate new waypoint based on robot size and trigenomitry functions in 7 steps
-	double offsetRadius = 0.5 * ROBOTRADIUS; //half the robot radius
+	double offsetRadius = 0.75 * ROBOTRADIUS; //roughly the robot radius
 	double distNewP;
 	double distNewP2;
 	double angleCollision;
@@ -372,7 +372,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	angleEx = atan2( (shortestExtremeToTarget.y - currentPos.y), (shortestExtremeToTarget.x - currentPos.x) );
 	
 	//V determine the angle between the edges to extreme and the new waypoint
-	angleExNewP = acos( (distExtreme2 + distNewP2 - offsetRadius)/(2 * (distExtreme * distNewP) ) ) * angleSign;
+	angleExNewP = acos( (distExtreme2 + distNewP2 - pow(offsetRadius,2))/(2 * (distExtreme * distNewP) ) ) * angleSign;
 	
 	//VI calculate the angle to the new waypoint
 	if(distExtrCollis == 0){ //prevent nan values
