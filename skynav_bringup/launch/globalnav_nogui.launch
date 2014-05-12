@@ -1,6 +1,0 @@
-<launch>
-	<node name="global_planner" pkg="skynav_globalnav" type="global_planner" required="true" output="screen" />
-	<node name="environment" pkg="skynav_globalnav" type="environment" required="true" output="screen" />
-	
-	<node name="map_reader" pkg="skynav_slam" type="map_reader" required="true" output="screen" />
-</launch>

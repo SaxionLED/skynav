@@ -1,0 +1,8 @@
+<launch>
+
+	<group ns="gui">
+		<node pkg="rviz" name="rviz" type="rviz" required="true"/>	
+		<node pkg="skynav_gui" name="skynav_gui" type="skynav_gui.py" required="false" output="screen"/>	
+	</group>
+	
+</launch>

@@ -1,0 +1,5 @@
+<launch>
+
+	<include file="$(find x80sv_bringup)/launch/real_robot_driver.launch"/>
+	
+</launch>

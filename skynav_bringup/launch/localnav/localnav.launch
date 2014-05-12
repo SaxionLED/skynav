@@ -1,0 +1,10 @@
+<launch>
+
+    <param name="robot_description" command="$(find xacro)/xacro.py '$(find x80sv_description)/urdf/x80sv.xacro'" />
+
+	<group ns="localnav">
+		<node pkg="skynav_localnav" name="obstacle_detector" type="obstacle_detector" output="screen"/>
+		<node pkg="skynav_localnav" name="local_planner" type="local_planner" output="screen"/>
+	</group>
+		
+</launch>
