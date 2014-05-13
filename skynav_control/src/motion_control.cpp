@@ -86,13 +86,16 @@ void pubNavigationStateHelper(NAVIGATION_STATE state) {
     pubNavigationState.publish(pubmsg);
 }
 
+//remove the current known path
 void clearPath() {
 	
-    mCurrentPath->clear(); // clear the path
+    mCurrentPath->clear(); 
     mOriginalPath->clear();
     path_init = false;
 }
 
+//update the current path.
+//if CONSECUTIVE_WAYPOINTS is active, the newly received path will be added to the current path
 void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {	
 	
 	ROS_INFO("path received by motion control");
@@ -112,9 +115,9 @@ void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 	path_init = true;
 }
 
+//update the current movement_state
 void setMovementState(MOVEMENT_STATE moveState) {
 	
-    // set the local state to ensure there is no delay
     mMovementState = moveState;
 }
 
@@ -130,11 +133,11 @@ void publishCmdVel(Twist twist)	{
 		ROS_ERROR("Attempt to send cmdvel %f, which is higher than max intended velocity. sending max intended velocity of: %f",twist.linear.x,MOTION_VELOCITY);
 		twist.linear.x = MOTION_VELOCITY;
 	}	
-	//publish to cmd_vel
+	
 	pubCmdVel.publish(twist);
 
 	// this timer is to timeout the target location
-	//mCmdVelTimeout = mNode->createTimer(ros::Duration(t), cmdVelTimeoutCallback); //TODO timer value
+	//mCmdVelTimeout = mNode->createTimer(ros::Duration(t), cmdVelTimeoutCallback); 
 }
 
 void cmdVelTimeoutCallback(const ros::TimerEvent&) {
@@ -231,41 +234,6 @@ void navigate() {
 
     switch (mNavigationState) {
 
-        case NAV_UNREACHABLE:
-        {
-            ROS_WARN("NAV_UNREACHABLE");
-			ROS_INFO("Could not reach target pose");
-			clearPath();
-        }
-        break;
-        case NAV_POSE_REACHED:
-        {
-			ROS_WARN("NAV_POSE_REACHED");
-            if (mCurrentPath->size() == 1) { // just finished the last waypoint, about to remove it, but take orientation first
-                ROS_INFO("waypoint list empty, assuming end orientation");
-                
-                //motionTurn(mEndOrientation); //function is blocking when mEndOrientation is not reached
-               
-                mCurrentPath->pop_front();
-                ROS_INFO("Target reached");                
-
-            } else {
-                // check if pose was actually reached
-                if (ROBOT_WAYPOINT_ACCURACY) {
-					Pose currentPose = getCurrentPose();
-                    if (posesEqual(currentPose, mCurrentPath->front().pose)) { // if within error value of target
-                        mCurrentPath->pop_front();
-                    }else{
-						ROS_ERROR("target not quite reached; compensating");						
-					}
-                } else {
-				    ROS_INFO("nav pose reached unchecked, continue"); 
-					mCurrentPath->pop_front();					
-					}
-            }            
-			pubNavigationStateHelper(NAV_READY);
-        }
-        break;
         case NAV_READY: 	
         {						
             if (!mCurrentPath->size() == 0){ 
@@ -286,6 +254,34 @@ void navigate() {
 			}
         }
 		break;
+        case NAV_POSE_REACHED:
+        {	
+			Pose currentPose = getCurrentPose();
+			PoseStamped targetPose = mCurrentPath->front();
+			ROS_WARN("NAV_POSE_REACHED");
+			
+			if (ROBOT_WAYPOINT_ACCURACY) 
+			{				
+				if (posesEqual(currentPose, targetPose.pose)) 
+				{ 
+					mCurrentPath->pop_front();
+					
+				}else{
+					ROS_ERROR("target not quite reached; compensating");						
+				}				
+			}else{
+				ROS_INFO("nav pose reached unchecked, continue"); 
+				mCurrentPath->pop_front();					
+			}
+			
+			if(mCurrentPath->empty()){
+				ROS_INFO("Waypoint list empty, target reached");                
+                //motionTurn(mEndOrientation); //function is blocking when mEndOrientation is not reached
+			}
+                       
+			pubNavigationStateHelper(NAV_READY);
+        }
+        break;
 		case NAV_MOVING:
         {			
 			ROS_WARN("NAV_MOVING");
@@ -299,13 +295,13 @@ void navigate() {
 			Pose relativeTargetPose;
 			Twist currentVelocity;
 			
-			double theta;						//relative angle to target
-			float breakDist;					//distance for robot to decel 
+			double theta;								//relative angle to target
+			float breakDist;							//distance for robot to decel 
 			double steadyVelocity = MOTION_VELOCITY;
 			
 			Twist twist_stop;
 			
-			bool in_motion = false;		//"is currently busy"  boolean
+			bool in_motion = false;						//"is currently busy"  boolean
 			setMovementState(MOV_READY);
 			
 			while(mNavigationState == NAV_MOVING){ 		//while(!interrupted){
@@ -527,6 +523,14 @@ void navigate() {
 			ROS_WARN("NAV_ERROR");
             clearPath();
             pubNavigationStateHelper(NAV_STOP);            
+        }
+        break;
+        case NAV_UNREACHABLE:
+        {
+            ROS_WARN("NAV_UNREACHABLE");
+			ROS_INFO("Could not reach target pose");
+			clearPath();
+			pubNavigationStateHelper(NAV_STOP);  
         }
         break;
         case NAV_STOP:
