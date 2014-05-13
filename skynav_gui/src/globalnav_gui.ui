@@ -72,7 +72,7 @@
           <bool>true</bool>
          </property>
          <property name="currentIndex">
-          <number>3</number>
+          <number>1</number>
          </property>
          <widget class="QWidget" name="info_tab">
           <attribute name="title">
@@ -91,6 +91,111 @@
               <number>0</number>
              </property>
             </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="manualTarget_tab">
+          <attribute name="title">
+           <string>manualTarget</string>
+          </attribute>
+          <layout class="QGridLayout" name="gridLayout_3">
+           <item row="2" column="0">
+            <layout class="QHBoxLayout" name="horizontalLayout_5">
+             <item>
+              <widget class="QLineEdit" name="manualTarget_x_input">
+               <property name="toolTip">
+                <string/>
+               </property>
+               <property name="statusTip">
+                <string>x coordinate of start position</string>
+               </property>
+               <property name="inputMethodHints">
+                <set>Qt::ImhDigitsOnly</set>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+               <property name="placeholderText">
+                <string>X</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="manualTarget_y_input">
+               <property name="toolTip">
+                <string/>
+               </property>
+               <property name="statusTip">
+                <string>y coordinate of start position</string>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+               <property name="placeholderText">
+                <string>Y</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QLineEdit" name="manualTarget_th_input">
+               <property name="enabled">
+                <bool>true</bool>
+               </property>
+               <property name="toolTip">
+                <string/>
+               </property>
+               <property name="statusTip">
+                <string>angle of the start position with respect to the absolute environment map, in degrees</string>
+               </property>
+               <property name="text">
+                <string/>
+               </property>
+               <property name="placeholderText">
+                <string>Angle</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
+           </item>
+           <item row="0" column="0">
+            <spacer name="verticalSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item row="1" column="0">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>manual target input (in m):</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0">
+            <widget class="QPushButton" name="manualTargetButton">
+             <property name="text">
+              <string>SEND</string>
+             </property>
+            </widget>
+           </item>
+           <item row="5" column="0">
+            <spacer name="verticalSpacer_2">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint" stdset="0">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
            </item>
           </layout>
          </widget>
@@ -216,6 +321,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_17">
                <item>
                 <widget class="QLabel" name="label_1">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
                  <property name="text">
                   <string>1</string>
                  </property>
@@ -237,6 +345,9 @@
               <layout class="QHBoxLayout" name="horizontalLayout_18">
                <item>
                 <widget class="QLabel" name="label_2">
+                 <property name="enabled">
+                  <bool>false</bool>
+                 </property>
                  <property name="text">
                   <string>2</string>
                  </property>
@@ -357,111 +468,6 @@
            </item>
           </layout>
          </widget>
-         <widget class="QWidget" name="manualTarget_tab">
-          <attribute name="title">
-           <string>manualTarget</string>
-          </attribute>
-          <layout class="QGridLayout" name="gridLayout_3">
-           <item row="2" column="0">
-            <layout class="QHBoxLayout" name="horizontalLayout_5">
-             <item>
-              <widget class="QLineEdit" name="manualTarget_x_input">
-               <property name="toolTip">
-                <string/>
-               </property>
-               <property name="statusTip">
-                <string>x coordinate of start position</string>
-               </property>
-               <property name="inputMethodHints">
-                <set>Qt::ImhDigitsOnly</set>
-               </property>
-               <property name="text">
-                <string/>
-               </property>
-               <property name="placeholderText">
-                <string>X</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="manualTarget_y_input">
-               <property name="toolTip">
-                <string/>
-               </property>
-               <property name="statusTip">
-                <string>y coordinate of start position</string>
-               </property>
-               <property name="text">
-                <string/>
-               </property>
-               <property name="placeholderText">
-                <string>Y</string>
-               </property>
-              </widget>
-             </item>
-             <item>
-              <widget class="QLineEdit" name="manualTarget_th_input">
-               <property name="enabled">
-                <bool>true</bool>
-               </property>
-               <property name="toolTip">
-                <string/>
-               </property>
-               <property name="statusTip">
-                <string>angle of the start position with respect to the absolute environment map, in degrees</string>
-               </property>
-               <property name="text">
-                <string/>
-               </property>
-               <property name="placeholderText">
-                <string>Angle</string>
-               </property>
-              </widget>
-             </item>
-            </layout>
-           </item>
-           <item row="0" column="0">
-            <spacer name="verticalSpacer">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>40</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="label">
-             <property name="text">
-              <string>manual target input (in m):</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="0">
-            <widget class="QPushButton" name="manualTargetButton">
-             <property name="text">
-              <string>SEND</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="0">
-            <spacer name="verticalSpacer_2">
-             <property name="orientation">
-              <enum>Qt::Vertical</enum>
-             </property>
-             <property name="sizeHint" stdset="0">
-              <size>
-               <width>20</width>
-               <height>40</height>
-              </size>
-             </property>
-            </spacer>
-           </item>
-          </layout>
-         </widget>
         </widget>
        </item>
        <item>
@@ -527,8 +533,14 @@
               <property name="inputMethodHints">
                <set>Qt::ImhDigitsOnly</set>
               </property>
+              <property name="inputMask">
+               <string/>
+              </property>
               <property name="text">
                <string/>
+              </property>
+              <property name="maxLength">
+               <number>10</number>
               </property>
               <property name="placeholderText">
                <string>X</string>
@@ -543,8 +555,14 @@
               <property name="statusTip">
                <string>y coordinate of start position</string>
               </property>
+              <property name="inputMask">
+               <string/>
+              </property>
               <property name="text">
                <string/>
+              </property>
+              <property name="maxLength">
+               <number>10</number>
               </property>
               <property name="placeholderText">
                <string>Y</string>
@@ -564,6 +582,9 @@
               </property>
               <property name="text">
                <string/>
+              </property>
+              <property name="maxLength">
+               <number>10</number>
               </property>
               <property name="placeholderText">
                <string>Angle</string>
@@ -601,6 +622,9 @@
               <property name="text">
                <string/>
               </property>
+              <property name="maxLength">
+               <number>10</number>
+              </property>
               <property name="placeholderText">
                <string>X</string>
               </property>
@@ -616,6 +640,9 @@
               </property>
               <property name="text">
                <string/>
+              </property>
+              <property name="maxLength">
+               <number>10</number>
               </property>
               <property name="placeholderText">
                <string>Y</string>
@@ -635,6 +662,9 @@
               </property>
               <property name="text">
                <string/>
+              </property>
+              <property name="maxLength">
+               <number>10</number>
               </property>
               <property name="placeholderText">
                <string>Angle</string>
@@ -672,7 +702,7 @@
        <enum>QTabWidget::Rounded</enum>
       </property>
       <property name="currentIndex">
-       <number>2</number>
+       <number>0</number>
       </property>
       <widget class="QWidget" name="Map_tab">
        <attribute name="title">

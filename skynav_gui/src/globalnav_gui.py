@@ -146,7 +146,6 @@ class GlobalNavGUI(QWidget):
 		if thM:
 			pos.orientation.z = float(thM)
 		else:
-			#print "no viable target theta set, default"
 			pos.orientation.z = float(0)
 		
 		msg = Path()
@@ -400,9 +399,9 @@ class GlobalNavGUI(QWidget):
 
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------------
-	#load a 400x400 cm demo map and set the start and end coordinates automatically
+	#load a demo map and set the start and end coordinates automatically
 	def demoFunction(self):
-		fileName = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../maps/testmap5.txt')
+		fileName = os.path.join(os.path.dirname(os.path.realpath(__file__)), '../maps/testmap7.txt')
 		try:
 				ret = self.loadNewMap_srv(1,fileName)
 
@@ -414,18 +413,18 @@ class GlobalNavGUI(QWidget):
 				self.mapdata = MapData(xdim,ydim,res,ret.map.data)
 				
 				self.updateView(xdim,ydim,fileName)
-
+				
+								#demo coordinates
+				self._widget.start_x_input.setText("0.01")
+				self._widget.start_y_input.setText("0.01")
+				self._widget.target_x_input.setText("4")
+				self._widget.target_y_input.setText("4")
+				self._widget.start_th_input.setText("0")
+				self._widget.target_th_input.setText("180")
 				
 		except rospy.ServiceException, e:
 				self._widget.info_textbox.append("no map could be read")
 				self._widget.debug_textbrowser.append("Service call failed: %s"%e)
 		
-		#demo coordinates
-		self._widget.start_x_input.setText("1")
-		self._widget.start_y_input.setText("1")
-		self._widget.target_x_input.setText("398")
-		self._widget.target_y_input.setText("398")
-		self._widget.start_th_input.setText("0")
-		self._widget.target_th_input.setText("180")
 
 	
