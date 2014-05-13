@@ -52,6 +52,7 @@ class GlobalPlanner
 private:
   std::string node_name_;
   ros::NodeHandle* node_;
+  ros::NodeHandle* node_control_;
   int loop_rate_;
 
   navigation_states::navigation_state navigation_state_;
@@ -90,7 +91,9 @@ public:
   virtual ~GlobalPlanner()
   {
     delete node_;
-    if (p_mMapData)
+    delete node_control_;
+   
+	if (p_mMapData)
     {
       delete p_mMapData;
     }
@@ -113,14 +116,17 @@ GlobalPlanner::GlobalPlanner(std::string node_name, int loop_rate) :
     node_name_(node_name), loop_rate_(loop_rate)
 {
   node_ = new ros::NodeHandle("/globalnav");
+  node_control_ = new ros::NodeHandle("/control");
 
+//service servers
   pathQuery_srv_ = node_->advertiseService("path_query", &GlobalPlanner::respond_pathQuery, this);
   fixedWaypoints_srv_ = node_->advertiseService("update_fixed_waypoints", &GlobalPlanner::respond_fixedWaypoints, this);
-
+//service client
   getEnvironmentInfo_ = node_->serviceClient<skynav_msgs::environment_srv>("environment_req");
-
+//publisher
   waypoints_pub_ = node_->advertise<nav_msgs::Path>("waypoints", 10);
-  navigation_state_sub_ = node_->subscribe("navigation_state", 10, &GlobalPlanner::navigation_stateCallback, this);
+//subscriber  
+  navigation_state_sub_ = node_control_->subscribe("navigation_state", 10, &GlobalPlanner::navigation_stateCallback, this);
   user_init_sub_ = node_->subscribe("user_init", 10, &GlobalPlanner::user_InitCallback, this);
 
   planner_state_ = planner_state::Idle;
