@@ -338,7 +338,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	}
 	
 	//calculate new waypoint based on robot size and trigenomitry functions in 7 steps
-	double offsetRadius = 0.75 * ROBOTRADIUS; //roughly the robot radius
+	double offsetRadius = 0.5 * ROBOTRADIUS; //roughly the distance the robot-center needs to keep from objects to avoid colission
 	double distNewP;
 	double distNewP2;
 	double angleCollision;

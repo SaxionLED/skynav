@@ -84,7 +84,6 @@ void pubNavigationStateHelper(NAVIGATION_STATE state) {
     std_msgs::UInt8 pubmsg;
     pubmsg.data = state;
     pubNavigationState.publish(pubmsg);
-    //ROS_INFO("nav state function changed to %u", state);
 }
 
 void clearPath() {
@@ -117,7 +116,6 @@ void setMovementState(MOVEMENT_STATE moveState) {
 	
     // set the local state to ensure there is no delay
     mMovementState = moveState;
-    //ROS_INFO("mov_state changed to %u", moveState);
 }
 
 //calculate distance between two point with use of pythagoras
@@ -347,11 +345,9 @@ void navigate() {
 							in_motion = true;
 						}						
 						//method for turning more precise. first turn a rough angle, then turn the remaining, on a slower rate
-						//turn rough angle
 						if(!(currentPose.orientation.z < theta + ANGLE_ERROR_FIRST && currentPose.orientation.z > theta - ANGLE_ERROR_FIRST))	{
 							//do nothing, continue turning
 						}else{	
-							//ROS_INFO("1st stage rough turning done");					
 							publishCmdVel(twist_stop); //stop movement
 							rate.sleep();
 
@@ -368,6 +364,7 @@ void navigate() {
 								}
 								publishCmdVel(twist);
 								
+								
 								while(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
 									//do nothing, continue turning
 									currentPose = getCurrentPose();
@@ -375,8 +372,6 @@ void navigate() {
 								}
 							}
 							publishCmdVel(twist_stop); //stop movement
-
-							//ROS_INFO("2nd stage precision turning done");
 							
 							in_motion = false;
 							
@@ -428,8 +423,7 @@ void navigate() {
 							
 						double dist_traversed = relativeTargetPose.position.x - (calcDistance(currentPose.position,originalPose.position));
 						if(dist_traversed > breakDist){
-							//do nothing, continue moving	
-
+							//do nothing, continue moving
 						}else{
 							steadyVelocity = currentVelocity.linear.x;
 							setMovementState(MOV_DECEL);
@@ -574,9 +568,9 @@ int main(int argc, char **argv) {
 
 
     //pubs
-    pubCmdVel = n.advertise<Twist>("/cmd_vel", 2);
+    pubCmdVel = n.advertise<Twist>("/cmd_vel", 1);
     pubNavigationState = mNode->advertise<std_msgs::UInt8>("navigation_state", 0);
-    pubTargetPoseStamped = mNode->advertise<geometry_msgs::PoseStamped>("target_pose", 4);
+    pubTargetPoseStamped = mNode->advertise<geometry_msgs::PoseStamped>("target_pose", 1);
 
     //subs
     ros::Subscriber subCheckedWaypoints = mNode->subscribe("checked_waypoints", 1, subCheckedWaypointsCallback);
@@ -588,16 +582,15 @@ int main(int argc, char **argv) {
     
     servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
 
-    // hz
-    ros::Rate loop_rate(10); // loop every 100ms
+    ros::Rate loop_rate(10); // loop at 10hz
 
     while (ros::ok()) {
 
-        ros::spinOnce(); // read topics
+        ros::spinOnce(); 
 
 		navigate();
 
-        loop_rate.sleep(); // sleep
+        loop_rate.sleep();
     }
 
     delete mNode;
