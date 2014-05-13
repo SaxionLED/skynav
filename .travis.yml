@@ -22,6 +22,7 @@ before_install:
   - rosdep update
 install:
   # make a workspace and checkout the right repos:
+  - source /opt/ros/hydro/setup.bash
   - mkdir -p ~/skynav_ws/src
   - cd ~/skynav_ws/src
   - catkin_init_workspace
@@ -34,6 +35,7 @@ before_script:
   - cd ~/skynav_ws/src
 script:
   - cd ~/skynav_ws
+  - catkin_make
   - catkin_make tests
   - cd build
   - make run_tests
