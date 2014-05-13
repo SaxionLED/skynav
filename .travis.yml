@@ -9,11 +9,17 @@ python:
 compiler:
   - gcc
 
-
 install:
   - sudo apt-get update -qq
   - mkdir -p /tmp/skynav_ws/src
+  - cd /tmp/skynav_ws/src
+  - git clone https://github.com/SaxionLED/skynav.git
+  - git clone https://github.com/SaxionLED/x80sv.git
 
 script:
   - cd /tmp/skynav_ws
+  - catkin_make tests
+  - cd build
+  - make run_tests
+
 
