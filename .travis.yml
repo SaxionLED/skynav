@@ -18,13 +18,16 @@ install:
   - sudo rosdep init
   - rosdep update
   # make a workspace and checkout the right repos:
-  - mkdir -p /tmp/skynav_ws/src
-  - cd /tmp/skynav_ws/src
+  - mkdir -p ~/skynav_ws/src
+  - cd ~/skynav_ws/src
   - git clone https://github.com/SaxionLED/skynav.git
   - git clone https://github.com/SaxionLED/x80sv.git
-
+before_script:
+  - source /opt/ros/hydro/setup.bash
+  - cd ~/skynav_ws/src
+  - catkin_init_workspace
 script:
-  - cd /tmp/skynav_ws
+  - cd ~/skynav_ws
   - catkin_make tests
   - cd build
   - make run_tests
