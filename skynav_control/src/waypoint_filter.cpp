@@ -5,6 +5,8 @@
 #include <skynav_msgs/waypoint_check.h>
 #include <geometry_msgs/PoseStamped.h>
 
+#define INDEPENDENT_RUNNABLE	true			//if localnav is not active, dont check the path, and publish received path as-is.
+
 using namespace std;
 using namespace geometry_msgs;
 
@@ -12,13 +14,15 @@ ros::Publisher pubWaypoints;
 ros::Publisher pubDummyPath;
 ros::ServiceClient servClientWaypointCheck;
 
+
 void subNavigationStateCallback(const std_msgs::UInt8::ConstPtr& msg) {
 
     //    ROS_INFO("recv: %d", msg->data);
 }
 
+//recieve a path, either from globalnav, or a manual input
 void subGlobalPlannerWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
-	ROS_INFO("received new path from GlobalNav, check for known obstacles");
+	ROS_INFO("received new global path , check for known obstacles");
 	skynav_msgs::waypoint_check srv;
 	bool changedPath = false;
 	
@@ -44,9 +48,14 @@ void subGlobalPlannerWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 					nwWaypoints.insert(pathIt+(wp0+1),ps);		 		
 				}
 			}else{
-				ROS_ERROR("Failed to call waypoint check service from waypoint_filter.?");
+				ROS_ERROR("Failed to call waypoint check service from waypoint_filter. Is localnav active?");
+				if(INDEPENDENT_RUNNABLE){
+					ROS_WARN("Continue anyway");
+					break;
+				} else{
 				return;
 				//ros::shutdown();
+				}
 			}						 
 		}
 	}
@@ -57,37 +66,6 @@ void subGlobalPlannerWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 	}else{		
 		pubWaypoints.publish(msg);
 	}
-}
-
-//temp function to supply placeholder waypoints for testing without available globalnav modules
-//output a hardcoded absolute waypoint array
-void placeholderGlobalPlannerWaypoints() {
-	
-
-    ROS_INFO("Placeholder path generated");
-    nav_msgs::Path path;
-
-    path.header.frame_id = "/map";
-    path.header.stamp = ros::Time::now();
-    
-    PoseStamped ps;
-    ps.header.frame_id = "/map";
-    ps.header.stamp = ros::Time::now();
-
-     //start pose, has orientation 
-	{
-        ps.pose.position.x = 0;
-        ps.pose.position.y = 0;
-        path.poses.push_back(ps);
-    }
-    { // end pose, needs orientation
-        ps.pose.position.x = 0;
-        ps.pose.position.y = 0;
-        ps.pose.orientation.z = M_PI;   //180 deg
-        path.poses.push_back(ps);
-    }
-
-    pubDummyPath.publish(path); //publish dummy path data on waypoints topic
 }
 
 int main(int argc, char **argv) {
@@ -109,10 +87,6 @@ int main(int argc, char **argv) {
 
     //service
     servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
-
-   	//ros::Duration(15).sleep();
-      
-	//placeholderGlobalPlannerWaypoints();
 	
 	ros::spin();
 	
