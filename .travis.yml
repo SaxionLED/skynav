@@ -9,24 +9,29 @@ python:
 compiler:
   - gcc
 
-install:
+before_install:
+  - export CI_SOURCE_PATH=$(pwd)
   - sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu precise main" > /etc/apt/sources.list.d/ros-latest.list'
   - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
   - sudo apt-get update -qq
   - sudo apt-get install ros-hydro-ros-base
   - sudo apt-get install ros-hydro-joy
+  - sudo apt-get install ros-hydro-catkin ros-hydro-ros
   - sudo apt-get install python-catkin-pkg
   - sudo rosdep init
   - rosdep update
+install:
   # make a workspace and checkout the right repos:
   - mkdir -p ~/skynav_ws/src
   - cd ~/skynav_ws/src
-  - git clone https://github.com/SaxionLED/skynav.git
+  - catkin_init_workspace
+  - cd ..
+  - catkin_make
+  - ln -s $CI_SOURCE_PATH . # link repo under test.
   - git clone https://github.com/SaxionLED/x80sv.git
 before_script:
   - source /opt/ros/hydro/setup.bash
   - cd ~/skynav_ws/src
-  - catkin_init_workspace
 script:
   - cd ~/skynav_ws
   - catkin_make tests
