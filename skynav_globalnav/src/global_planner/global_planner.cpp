@@ -99,7 +99,7 @@ public:
     }
     if (p_mFullGraph)
     {
-      //delete p_mFullGraph;  TODO gives segfault.. needs inspection
+      delete p_mFullGraph;
     }
 
   }

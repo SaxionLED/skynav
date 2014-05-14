@@ -20,19 +20,6 @@ Node::Node(unsigned int x, unsigned int y, unsigned int id)
   this->mTheta = 0;
 
 }
-//Node::Node(Graph* graph, unsigned int x, unsigned int y, unsigned int id)
-//{
-//  this->p_mGraph = graph;
-//  this->mXpos = x;
-//  this->mYpos = y;
-//  this->mID = id;
-//  this->p_mParent = NULL;
-//  this->mF = 0;
-//  this->mG = 0;
-//  this->mH = 0;
-//  this->mType = nodeTypes::Not_Defined;
-//  this->mTheta = 0;
-//}
 
 Node::Node(Graph* graph, unsigned int x, unsigned int y, unsigned int id, nodeType type)
 {
@@ -50,10 +37,7 @@ Node::Node(Graph* graph, unsigned int x, unsigned int y, unsigned int id, nodeTy
 
 Node::~Node()
 {
-  for (std::vector<Node*>::iterator it = this->mAdjacencyList.begin(); it != this->mAdjacencyList.end(); it++)
-  {
-    delete (*it);
-  }
+//
 }
 
 float Node::estimateDist(unsigned int xDest, unsigned int yDest)
