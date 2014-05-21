@@ -15,7 +15,7 @@ before_install:
   - wget http://packages.ros.org/ros.key -O - | sudo apt-key add -
   - sudo apt-get update -qq
   - sudo apt-get install ros-hydro-ros-base
-  - sudo apt-get install ros-hydro-nav-msgs
+  - sudo apt-get install ros-hydro-nav-msgs ros-hydro-sensor-msgs
   - sudo apt-get install ros-hydro-catkin ros-hydro-ros
   - sudo apt-get install python-catkin-pkg
   - pip install catkin_pkg
