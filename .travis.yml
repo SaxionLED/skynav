@@ -18,6 +18,7 @@ before_install:
   - sudo apt-get install ros-hydro-joy
   - sudo apt-get install ros-hydro-catkin ros-hydro-ros
   - sudo apt-get install python-catkin-pkg
+  - pip install catkin_pkg
   - sudo rosdep init
   - rosdep update
 install:
