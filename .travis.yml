@@ -29,6 +29,7 @@ install:
   - catkin_init_workspace
   - cd ..
   - catkin_make
+  - cd ~/skynav_ws/src
   - ln -s $CI_SOURCE_PATH . # link repo under test.
   - git clone https://github.com/SaxionLED/x80sv.git
 before_script:
