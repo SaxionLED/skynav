@@ -21,4 +21,5 @@ add_dependencies(local_planner skynav_msgs_gencpp)
 add_dependencies(obstacle_detector skynav_msgs_gencpp)
 
 catkin_add_gtest(localnav_test test/test_localplanner.cpp src/local_planner_lib.cpp)
+target_link_libraries(localnav_test ${catkin_LIBRARIES})
 

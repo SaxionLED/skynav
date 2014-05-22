@@ -3,7 +3,9 @@
 	<name>skynav_localnav</name>
 	<version>0.0.0</version>
 	<description>skynav_localnav</description>
-	<maintainer email="christiaanmaks@mylittlesky.net">Christiaan Maks</maintainer>
+	<!--<maintainer email="christiaanmaks@mylittlesky.net">Christiaan Maks</maintainer>-->
+	<maintainer email="j.a.voskes@saxion.nl">Christiaan Maks</maintainer>
+
 	<license>BSD</license>
 	
 	<buildtool_depend>catkin</buildtool_depend>
@@ -14,8 +16,6 @@
 	<build_depend>tf</build_depend>
 	<build_depend>pcl_ros</build_depend>
 	<build_depend>rostest</build_depend>
-
-
 	
 	<run_depend>roscpp</run_depend>
 	<run_depend>skynav_msgs</run_depend>
