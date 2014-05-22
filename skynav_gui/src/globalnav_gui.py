@@ -149,8 +149,10 @@ class GlobalNavGUI(QWidget):
 			pos.orientation.z = float(0)
 		
 		msg = Path()
+		msg.header.frame_id = "/map"
+		msg.header.stamp = rospy.Time.now()
 		target = PoseStamped()
-		target.header.frame_id = '/map'
+		target.header.frame_id = "/map"
 		target.header.stamp = rospy.Time.now()
 		target.pose = pos
 	
@@ -250,7 +252,7 @@ class GlobalNavGUI(QWidget):
 	
 	
 	def updatePathCallback(self,path):
-		if hasattr(self, 'mapdata'):
+		if hasattr(self, "mapdata"):
 			self.sigPathUpdate.emit(path)
 		
 	#on receiving new path data, redraw the path
