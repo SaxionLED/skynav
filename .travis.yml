@@ -19,6 +19,7 @@ before_install:
   - sudo apt-get install ros-hydro-catkin ros-hydro-ros
   - sudo apt-get install python-catkin-pkg python-empy
   - pip install catkin_pkg
+  - pip install empy
   - sudo rosdep init
   - rosdep update
 install:
