@@ -20,20 +20,13 @@
 #include "graph.h"
 
 //custom msgs
-#include <skynav_msgs/navigation_state.h>
 #include <skynav_msgs/environment_info.h>
 #include <skynav_msgs/environment_srv.h>
 #include <skynav_msgs/user_init.h>
 #include <skynav_msgs/path_query_srv.h>
 #include <skynav_msgs/edit_fixedWPs_srv.h>
+#include <std_msgs/UInt8.h>
 
-namespace navigation_states
-{
-enum navigation_state
-{
-  IDLE, RUN, REACHED, UNREACHABLE, ERROR
-};
-}
 namespace planner_state
 {
 enum state_
@@ -55,7 +48,7 @@ private:
   ros::NodeHandle* node_control_;
   int loop_rate_;
 
-  navigation_states::navigation_state navigation_state_;
+  //TODO navigation_state;
   planner_state::state_ planner_state_;
 
   ros::Subscriber navigation_state_sub_;
@@ -104,13 +97,14 @@ public:
 
   }
   ;
-  void navigation_stateCallback(const skynav_msgs::navigation_state::ConstPtr& msg);
+  void navigation_stateCallback(const std_msgs::UInt8& msg);
   void user_InitCallback(const skynav_msgs::user_init::ConstPtr& msg);
 
   bool outputWaypoints(std::vector<Node*> &v_pPath);
   bool getEnvironmentData();
   void loop();
 };
+
 
 GlobalPlanner::GlobalPlanner(std::string node_name, int loop_rate) :
     node_name_(node_name), loop_rate_(loop_rate)
@@ -130,7 +124,7 @@ GlobalPlanner::GlobalPlanner(std::string node_name, int loop_rate) :
   user_init_sub_ = node_->subscribe("user_init", 10, &GlobalPlanner::user_InitCallback, this);
 
   planner_state_ = planner_state::Idle;
-  navigation_state_ = navigation_states::RUN;
+  //navigation_state_ = //TODO;
 
   p_mFullGraph = NULL;
   p_mMapData = NULL;
@@ -195,10 +189,10 @@ bool GlobalPlanner::respond_fixedWaypoints(skynav_msgs::edit_fixedWPs_srv::Reque
 /*
  * change the navigation_state
  */
-void GlobalPlanner::navigation_stateCallback(const skynav_msgs::navigation_state::ConstPtr& msg)
+void GlobalPlanner::navigation_stateCallback(const std_msgs::UInt8& msg )
 {
-  //TODO navigation_state_ = msg->state;
-  ROS_INFO("Navigation state changed");
+  //TODO navigation_state_ = msg.data;
+  //ROS_INFO("Navigation state changed");
 }
 
 /*
