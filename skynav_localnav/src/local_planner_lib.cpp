@@ -9,26 +9,31 @@ double calcDistance(Point a, Point b)
 }
 
 //truncate values (in meters) to certain precision
-float truncateValue(const float value){
+float truncateValue(const float value)
+{
 	return floorf(value*1000)/1000; //mm
 }
 
 //compare both points to each other
-bool compare_Point(Point p, Point q){
-	if((p.x == q.x) && (p.y = q.y)){
+bool compare_Point(Point p, Point q)
+{
+	if((p.x == q.x) && (p.y = q.y))
+	{
 		return true;
 	}
 	return false;
 }
 
 //determine the convex outer shape of the 2d pointcloud
-PointCloud convex_hull(PointCloud data){
+PointCloud convex_hull(PointCloud data)
+{
 	PointCloud PC;
 	pclPointCloudXYZ::Ptr cloud_in(new pclPointCloudXYZ);
 	pclPointCloudXYZ::Ptr cloud_out(new pclPointCloudXYZ);
 	pcl::ConvexHull<pclPoint> chull;
 	
-	for(vector<Point32>::iterator it = data.points.begin(); it!= data.points.end(); ++it){
+	for(vector<Point32>::iterator it = data.points.begin(); it!= data.points.end(); ++it)
+	{
 		cloud_in->push_back(pclPoint((*it).x,(*it).y,0));
 	}
 	
@@ -36,7 +41,8 @@ PointCloud convex_hull(PointCloud data){
 	chull.setDimension(2);
 	chull.reconstruct (*cloud_out);
 	
-	for(pclPointCloudXYZ::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it){
+	for(pclPointCloudXYZ::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it)
+	{
 		Point32 p;
 		p.x=(*it).x;
 		p.y=(*it).y;
@@ -48,13 +54,15 @@ PointCloud convex_hull(PointCloud data){
 }
 
 //determine the concave outer shape of the 2d pointcloud
-PointCloud concave_hull(PointCloud data){
+PointCloud concave_hull(PointCloud data)
+{
 	PointCloud PC;
 	pclPointCloudXYZ::Ptr cloud_in(new pclPointCloudXYZ);
 	pclPointCloudXYZ::Ptr cloud_out(new pclPointCloudXYZ);
 	pcl::ConcaveHull<pclPoint> chull;
 	
-	for(vector<Point32>::iterator it = data.points.begin(); it!= data.points.end(); ++it){
+	for(vector<Point32>::iterator it = data.points.begin(); it!= data.points.end(); ++it)
+	{
 		cloud_in->push_back(pclPoint((*it).x,(*it).y,0));
 	}
 	
@@ -62,7 +70,8 @@ PointCloud concave_hull(PointCloud data){
 	chull.setAlpha (0.5);
 	chull.reconstruct (*cloud_out);
 	
-	for(pclPointCloudXYZ::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it){
+	for(pclPointCloudXYZ::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it)
+	{
 		Point32 p;
 		p.x=(*it).x;
 		p.y=(*it).y;
@@ -74,9 +83,11 @@ PointCloud concave_hull(PointCloud data){
 }
 
 //recursive bug algorithm for object avoidance
-optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC){
+optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC)
+{
 
-	if(objectPC.points.empty()){
+	if(objectPC.points.empty())
+	{
 		ROS_WARN("Object size is zero, stopping recursive bug");
 		return optionPoint();	//return false;
 	}
@@ -100,7 +111,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	bool intersectFound;
 
 	//left side of scan radius
-	for(int i = 0; i<=180; ++i){
+	for(int i = 0; i<=180; ++i)
+	{
 		float angle = (M_PI*i)/180;
 		intersectFound = false;
 
@@ -113,7 +125,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 		B1 = currentPos.x - laser_coord.x;
 		C1 = A1*currentPos.x+B1*currentPos.y;
 		
-		for(int i = 0, j = 1; j<objectPC.points.size(); ++i,++j){
+		for(int i = 0, j = 1; j<objectPC.points.size(); ++i,++j)
+		{
 			Point32 pObstacle1 = objectPC.points.at(i);
 			Point32 pObstacle2 = objectPC.points.at(j);
 
@@ -123,7 +136,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 			C2 = A2*pObstacle1.x+B2*pObstacle1.y;				
 						
 			determant = A1*B2 - A2*B1;
-			if(determant == 0){
+			if(determant == 0)
+			{
 				continue;						//point has been processed. jump to next edge of the object
 			}
 			intersection.x = (B2*C1 - B1*C2)/determant;
@@ -131,10 +145,12 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 			
 			//check if intersection of lines occur within obstacle boundaries;
 			if(	min(pObstacle1.x,pObstacle2.x) <= intersection.x && intersection.x <= max(pObstacle1.x, pObstacle2.x) 
-			 && min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y)){	
+			 && min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y))
+			 {	
 				//check if intersection of lines occur within path boundaries;
 				if(	min(currentPos.x,laser_coord.x) <= intersection.x && intersection.x <= max(currentPos.x, laser_coord.x) 
-				 && min(currentPos.y,laser_coord.y) <= intersection.y && intersection.y <= max(currentPos.y, laser_coord.y)){
+				 && min(currentPos.y,laser_coord.y) <= intersection.y && intersection.y <= max(currentPos.y, laser_coord.y))
+				 {
 					//path collides with object						
 					intersectFound = true;				
 					break;	
@@ -142,7 +158,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 			}	
 		}
 		
-		if (!intersectFound){
+		if (!intersectFound)
+		{
 			//ROS_INFO("left  extreme at (%f, %f)", obstacleExtremeLeft.x, obstacleExtremeLeft.y);
 			break; // stop at first empty, previous hit was the extreme
 		}	
@@ -151,7 +168,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	}
 	
 	//right side of scan radius
-	for(int i = 0; i<=180; ++i){
+	for(int i = 0; i<=180; ++i)
+	{
 		float angle = (M_PI*i)/180;
 		intersectFound = false;
 
@@ -164,7 +182,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 		B1 = currentPos.x - laser_coord.x;
 		C1 = A1*currentPos.x+B1*currentPos.y;
 		
-		for(int i = 0, j = 1; j<objectPC.points.size(); ++i,++j){
+		for(int i = 0, j = 1; j<objectPC.points.size(); ++i,++j)
+		{
 			Point32 pObstacle1 = objectPC.points.at(i);
 			Point32 pObstacle2 = objectPC.points.at(j);
 
@@ -174,7 +193,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 			C2 = A2*pObstacle1.x+B2*pObstacle1.y;				
 						
 			determant = A1*B2 - A2*B1;
-			if(determant == 0){
+			if(determant == 0)
+			{
 				continue;						//point has been processed. jump to next edge of the object
 			}
 			intersection.x = (B2*C1 - B1*C2)/determant;
@@ -182,10 +202,12 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 
 			//check if intersection of lines occur within obstacle boundaries;
 			if(	min(pObstacle1.x,pObstacle2.x) <= intersection.x && intersection.x <= max(pObstacle1.x, pObstacle2.x) 
-			 && min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y)){	
+			 && min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y))
+			 {	
 				//check if intersection of lines occur within path boundaries;
 				if(	min(currentPos.x,laser_coord.x) <= intersection.x && intersection.x <= max(currentPos.x, laser_coord.x) 
-				 && min(currentPos.y,laser_coord.y) <= intersection.y && intersection.y <= max(currentPos.y, laser_coord.y)){
+				 && min(currentPos.y,laser_coord.y) <= intersection.y && intersection.y <= max(currentPos.y, laser_coord.y))
+				 {
 					//path collides with object						
 					intersectFound = true;
 					break;
@@ -193,7 +215,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 			}	
 		}
 		
-		if (!intersectFound){
+		if (!intersectFound)
+		{
 			//ROS_INFO("right  extreme at (%f, %f)", obstacleExtremeRight.x, obstacleExtremeRight.y);
 			break; // stop at first empty, previous hit was the extreme
 		}	
@@ -201,40 +224,25 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	}
 	
 	//check for errors with calculated extremes //TODO more checks
-	if((compare_Point(obstacleExtremeLeft,collisionPoint)) && (compare_Point(obstacleExtremeRight,collisionPoint))){
+	if((compare_Point(obstacleExtremeLeft,collisionPoint)) && (compare_Point(obstacleExtremeRight,collisionPoint)))
+	{
 		ROS_ERROR("no extremes found besides collisionpoint itself");
 		return optionPoint();	//return false;
 	}
 	
-	//{
-		////DEBUG publish extremes for visual debugging purposes
-		//PointCloud obExtremes;
-		//obExtremes.header.stamp = ros::Time::now();
-		//obExtremes.header.frame_id = "/map";
-		//Point32 left;
-		//Point32 right;
-		//left.x = obstacleExtremeLeft.x;
-		//left.y = obstacleExtremeLeft.y;
-		//left.z = 0.20;
-		//right.x = obstacleExtremeRight.x;
-		//right.y = obstacleExtremeRight.y;
-		//right.z = 0.20;
-		//obExtremes.points.push_back(left);
-		//obExtremes.points.push_back(right);
-		//pubObjectExtremes.publish(obExtremes);
-	//}
-	
 	//calc path via left extreme   
     double extremeLeftPathLength  = calcDistance(targetPos, obstacleExtremeLeft) + calcDistance(currentPos, obstacleExtremeLeft);
 	//calc path via right extreme    
-	double extremeRightPathLength = calcDistance(targetPos, obstacleExtremeRight) + calcDistance(currentPos, obstacleExtremeRight);;
+	double extremeRightPathLength = calcDistance(targetPos, obstacleExtremeRight) + calcDistance(currentPos, obstacleExtremeRight);
 	
 	int angleSign;
 	//determine extreme closest to target, 
-	if (extremeLeftPathLength < extremeRightPathLength){
+	if (extremeLeftPathLength < extremeRightPathLength)
+	{
 		shortestExtremeToTarget=obstacleExtremeLeft;
 		angleSign = 1;
-	}else{
+	}else
+	{
 		shortestExtremeToTarget = obstacleExtremeRight;
 		//apply offset sign
 		angleSign = -1;
@@ -300,7 +308,8 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 
 //function to determine if there is a colission, where, and (if needed) call for a new waypoint calculation.
 //if recursiveBugNeeded is true, the return value is the new waypoint calculated with the recursivebug algorithm, if false: the return is the collisionpoint itself
-optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCloud> outlines, bool recursiveBugNeeded){
+optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCloud> outlines, bool recursiveBugNeeded)
+{
 	
 	//line function for path Ax+By=C
 	double A1 = pPath2.y-pPath1.y;
@@ -316,9 +325,12 @@ optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCl
 	vector<PointCloud> intersect_obstacles;
 	bool collisionsFound=false;
 	
-	for (vector<PointCloud>::iterator outlineIt = outlines.begin(); outlineIt != outlines.end(); ++outlineIt) {
-		if((*outlineIt).points.size() >= 2){
-			for(int i = 0, j = 1; j<(*outlineIt).points.size(); ++i,++j){
+	for (vector<PointCloud>::iterator outlineIt = outlines.begin(); outlineIt != outlines.end(); ++outlineIt) 
+	{
+		if((*outlineIt).points.size() >= 2)
+		{
+			for(int i = 0, j = 1; j<(*outlineIt).points.size(); ++i,++j)
+			{
 
 				Point32 pObstacle1 = (*outlineIt).points.at(i);
 				Point32 pObstacle2 = (*outlineIt).points.at(j);
@@ -329,7 +341,8 @@ optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCl
 				C2 = A2*pObstacle1.x+B2*pObstacle1.y;				
 							
 				determant = A1*B2 - A2*B1;
-				if(determant == 0){
+				if(determant == 0)
+				{
 					//ROS_INFO("no intersections");	//Lines are parallel
 					continue;						//point has been processed. jump to next edge of the object
 				}
@@ -338,10 +351,12 @@ optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCl
 				
 				//check if intersection of lines occur within obstacle boundaries;
 				if(	min(pObstacle1.x,pObstacle2.x) <= intersection.x && intersection.x <= max(pObstacle1.x, pObstacle2.x) 
-				 && min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y)){	
+				 && min(pObstacle1.y,pObstacle2.y) <= intersection.y && intersection.y <= max(pObstacle1.y, pObstacle2.y))
+				 {	
 					//check if intersection of lines occur within path boundaries;
 					if(	min(pPath1.x,pPath2.x) <= intersection.x && intersection.x <= max(pPath1.x, pPath2.x) 
-					 && min(pPath1.y,pPath2.y) <= intersection.y && intersection.y <= max(pPath1.y, pPath2.y)){
+					 && min(pPath1.y,pPath2.y) <= intersection.y && intersection.y <= max(pPath1.y, pPath2.y))
+					 {
 						//path collides with object						
 						collisionsFound = true;
 						colissions.push_back(intersection);
@@ -353,16 +368,19 @@ optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCl
 		}
 	}
 	
-	if(collisionsFound){
+	if(collisionsFound)
+	{
 		//find relevant colission from set of colissions
 		Point relColission;
 		PointCloud relObject;
 		double colDistance = 9999; // initiate distance at "far from robot" TODO set certain distance
 		double newDist;
 
-		for(int i =0; i<colissions.size(); ++i){
+		for(int i =0; i<colissions.size(); ++i)
+		{
 			newDist = calcDistance(pPath1,colissions.at(i));
-			if( newDist < colDistance ){		
+			if( newDist < colDistance )
+			{		
 				colDistance = newDist;		
 				relColission = colissions.at(i);
 				relObject = intersect_obstacles.at(i);
@@ -370,10 +388,12 @@ optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCl
 		}		
 		//ROS_INFO("colission at (%f, %f), %d", relColission.x, relColission.y, relObject.points.size());
 		
-		if(recursiveBugNeeded){
+		if(recursiveBugNeeded)
+		{
 			//calculate new Point newPoint with recursive bug algorithm
 			optionPoint newPoint;
-			if((newPoint = recursiveBug(pPath1, pPath2, relColission, relObject))){
+			if((newPoint = recursiveBug(pPath1, pPath2, relColission, relObject)))
+			{
 				//ROS_INFO("newpoint at (%f, %f)", (*newPoint).x, (*newPoint).y);
 				return optionPoint(newPoint);  //return true, with new waypoint 		
 			}			
