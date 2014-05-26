@@ -9,9 +9,6 @@ add_message_files(
   Objects.msg
   Point32Stamped.msg
   Pose2DArray.msg
-  RangeArray.msg
-  RangeDefined.msg
-  RangeDefinedArray.msg
   TimedPose.msg
   environment_info.msg
   navigation_state.msg
