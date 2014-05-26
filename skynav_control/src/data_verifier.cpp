@@ -1,7 +1,5 @@
 #include <ros/ros.h>
 #include <geometry_msgs/Pose.h>
-#include <skynav_msgs/RangeDefinedArray.h>
-#include <skynav_msgs/RangeDefined.h>
 #include <sensor_msgs/Range.h>
 #include <sensor_msgs/LaserScan.h>
 #include <skynav_msgs/current_pose.h>
@@ -42,12 +40,14 @@ void subNavigationStateCallback(const std_msgs::UInt8& msg ){
 	//ROS_INFO("localnav NavigationState: %d", msg.data);	
 }
 
+/*
 void subSensorsCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
     
     // check limits here
     
     pubSensors.publish(msg);
 }
+*/
 
 void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg)        {
     
@@ -110,12 +110,12 @@ int main(int argc, char **argv) {
     
     //pubs
     pubOdometry = n.advertise<geometry_msgs::Pose>("odometry", 32);
-    pubSensors = n.advertise<skynav_msgs::RangeDefinedArray>("sensors", 1024);
+    // pubSensors = n.advertise<skynav_msgs::RangeDefinedArray>("sensors", 1024);
     pubLaser = n.advertise<sensor_msgs::LaserScan>("laser_scan", 1024);    
 	pubLaserFiltered = n.advertise<LaserScan>("laser/scan_filtered", 1024);
 	
     //subs
-    ros::Subscriber subSensors = n_robot.subscribe("sensors", 1024, subSensorsCallback);    
+    // ros::Subscriber subSensors = n_robot.subscribe("sensors", 1024, subSensorsCallback);    
     ros::Subscriber subRelativePose = n_robot.subscribe("odometry", 32, subRelativePoseCallback);
     ros::Subscriber subLaserRobot = n.subscribe("laser/scan_filtered", 1024, subLaserScanCallback);	
 	ros::Subscriber subLaser = n_robot.subscribe("laser/scan", 1024, subFilterLaserCallback);	

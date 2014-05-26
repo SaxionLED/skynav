@@ -1,7 +1,5 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Range.h>
-#include <skynav_msgs/RangeDefinedArray.h>
-#include <skynav_msgs/RangeDefined.h>
 #include <sensor_msgs/PointCloud.h>
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/Pose.h>
@@ -103,43 +101,11 @@ float truncateValue(const float value){
 	return floorf(value*100)/100; //cm 
 }
 
-void subSensorCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {	// for x80 sonar/IR sensors
 
-    Pose currentPose = getCurrentPose();
-
-    PointCloud pointCloud;
-
-    for (uint i = 0; i < msg->ranges.size(); i++) {
-
-        skynav_msgs::RangeDefined rangeMsg = msg->ranges.at(i);
-
-        if (rangeMsg.range.range > rangeMsg.range.min_range && rangeMsg.range.range < rangeMsg.range.max_range) { // skip if not within limits
-
-            double alpha = rangeMsg.angleFromCenter + currentPose.orientation.z; // sensor angle + current pose angle
-            double distance = rangeMsg.distanceFromCenter + rangeMsg.range.range; // sensor range + offset from center
-
-            double objectX = (cos(alpha) * distance) + currentPose.position.x; // add current pose x
-            double objectY = (sin(alpha) * distance) + currentPose.position.y + rangeMsg.yOffsetFromCenter; // y
-
-            Point32 p;
-            p.x = truncateValue(objectX); 
-            p.y = truncateValue(objectY);
-
-            pointCloud.points.push_back(p);
-        }
-    }
-
-    if (pointCloud.points.size() > 0) {
-
-        pointCloud.header.stamp = ros::Time::now();
-        pointCloud.header.frame_id = "/base_link";
-
-        pubSensorData.publish(pointCloud);
-    }
-}
 //receive laserscan data and convert to pointcloud
 //move this function to data_verifier.cpp !?
-void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)	{
+void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)
+{
 	
 	 if(!mTransformListener->waitForTransform(scan_in->header.frame_id, "/map", scan_in->header.stamp + ros::Duration().fromSec(scan_in->ranges.size()*scan_in->time_increment), ros::Duration(1.0)))	{
 		return;
@@ -328,7 +294,8 @@ int main(int argc, char **argv) {
     pubObstacles = n.advertise<skynav_msgs::Objects>("obstacles", 1024);
 
     //subs
-    ros::Subscriber subSensors = n_control.subscribe("sensors", 10, subSensorCallback); // raw unprocessed sensor values
+    // TODO: subscribe to pointcloud in base_link frame from sensors and translate to "map" frame for obstacle detection.
+    // ros::Subscriber subSensors = n_control.subscribe("sensors", 10, subSensorCallback); // raw unprocessed sensor values
     ros::Subscriber subSensorData = n.subscribe("sensor_data", 10, subObjectDetectionCallback);
     ros::Subscriber subLaser = n_control.subscribe("laser_scan", 10, subLaserScanCallback);
 
