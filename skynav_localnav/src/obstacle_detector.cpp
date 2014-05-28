@@ -1,17 +1,31 @@
 #include <ros/ros.h>
+
 #include <sensor_msgs/Range.h>
 #include <sensor_msgs/PointCloud.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/point_cloud_conversion.h>
+
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/Pose.h>
+
 #include <skynav_msgs/current_pose.h>
 #include <skynav_msgs/Object.h>
-#include <set>
-#include <sensor_msgs/LaserScan.h>
-#include <laser_geometry/laser_geometry.h>
-#include <tf/transform_listener.h>
 #include <skynav_msgs/Objects.h>
 
-#define MEMORY 							false 	// set this to true when using the simulator, false indicates the actual robot with lower specs is used
+#include <pcl_ros/point_cloud.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h> 
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/kdtree/kdtree.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/segmentation/extract_clusters.h>
+
+#include <boost/thread/mutex.hpp>
+#include <set>
+#include <laser_geometry/laser_geometry.h>
+#include <tf/transform_listener.h>
+
 #define ROBOTRADIUS 					0.5 	//the radius of the robot in meters. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 					4		//the outer range of the sensors in meters
 
@@ -19,8 +33,8 @@ using namespace std;
 using namespace geometry_msgs;
 using namespace sensor_msgs;
 
-struct compPoint {
-
+struct compPoint 
+{
     bool operator() (const Point32& first, const Point32& second) const {
         if (first.x < second.x)
             return true;
@@ -36,17 +50,23 @@ struct compPoint {
 
 int mObjectsFound = 0;
 
-ros::Publisher pubObjects, pubObstacles, pubSensorData;
+ros::Publisher pubObjects, pubClusters, pubObstacles, pubSensorData, pubSensorData_old, pubCloud;
 ros::ServiceClient servClientCurrentPose;
 
 laser_geometry::LaserProjection mLaserProjector;
 tf::TransformListener* mTransformListener;
 
 set<Point32, compPoint> mSensorData;
-vector<PointCloud> mObjects;	//objects in memory
+vector<PointCloud> mObjects;				//objects in memory (old)
 
-Pose getCurrentPose() {
+vector<pcl::PCLPointCloud2> mClusters;		//the set of clusters
+vector<pcl::PCLPointCloud2> mClouds;		//the set of pointclouds received in one loop
+pcl::PCLPointCloud2 mCloud;					//the concatinated pointcloud, created from all received pointclouds in in one loop
 
+boost::mutex mMutex;
+
+Pose getCurrentPose() 
+{
     Pose currentPose;
 
     skynav_msgs::current_pose poseService;
@@ -62,6 +82,7 @@ Pose getCurrentPose() {
 
     return currentPose;
 }
+
 
 //determine if a point already exist in a list of points.
 static bool pointExists(const Point32* a, vector<Point32>* vec) {
@@ -84,62 +105,167 @@ static bool pointExists(const Point32* a, vector<Point32>* vec) {
     return false;									//point does not already exist
 }
 
-//determine if two points are within a certain distance to eachother
-static bool pointInRange(const Point32* a, const Point32* b, const double searchDistance) {
 
+//determine if two points are within a certain distance to eachother
+static bool pointInRange(const Point32* a, const Point32* b, const double searchDistance) 
+{
 		double xyDistance = sqrt(pow((a->x -b->x),2) + pow((a->y - b->y),2));	//use pythagoras to determine if coordinates of a are within certain range of b
-		if(xyDistance <= searchDistance){														
+		if(xyDistance <= searchDistance)
+		{														
 			return true;
-		}
-    
+		}  		  
     return false;
 }
 
-//truncate values (in meters) to certain precision
-float truncateValue(const float value){
-	//return floorf(value*1000)/1000; //mm
-	return floorf(value*100)/100; //cm 
-}
 
-
-//receive laserscan data and convert to pointcloud
-//move this function to data_verifier.cpp !?
-void subLaserScanCallback(const sensor_msgs::LaserScan::ConstPtr& scan_in)
+//truncate values (in meters) to mm precision
+float truncateValue(const float value)
 {
-	
-	 if(!mTransformListener->waitForTransform(scan_in->header.frame_id, "/map", scan_in->header.stamp + ros::Duration().fromSec(scan_in->ranges.size()*scan_in->time_increment), ros::Duration(1.0)))	{
-		return;
-	}	
-	
-	PointCloud pointCloud;
-	try
-	{
-		mLaserProjector.transformLaserScanToPointCloud("/map", *scan_in, pointCloud, *mTransformListener);
-	}
-	catch (tf::TransformException& e)
-	{
-		ROS_ERROR("obstacle_detector - %s", e.what());
-	}
-
-	if (pointCloud.points.size() > 0) {
-		
-		//truncate pointcloud coordinates to mm precision.
-		for(vector<Point32>::iterator it = pointCloud.points.begin(); it != pointCloud.points.end(); it++){
-			(*it).x = truncateValue((*it).x );
-			(*it).y = truncateValue((*it).y);
-			(*it).z = truncateValue((*it).z);
-		}			
-
-        pointCloud.header.stamp = ros::Time::now();
-        pointCloud.header.frame_id = "/map";
-
-        pubSensorData.publish(pointCloud);
-    }
-	
+	return floorf(value*1000)/1000; //mm
 }
 
+
+//concatinate the two pointclouds and return this pointcloud
+pcl::PCLPointCloud2 concatinateClouds(const pcl::PCLPointCloud2& inputCloudA, const pcl::PCLPointCloud2& inputCloudB)
+{	
+	pcl::PCLPointCloud2 returnCloud;	
+	
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud1 (new pcl::PointCloud<pcl::PointXYZI>);
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud2 (new pcl::PointCloud<pcl::PointXYZI>);
+
+	pcl::fromPCLPointCloud2(inputCloudA, *cloud1);
+	pcl::fromPCLPointCloud2(inputCloudB, *cloud2);
+	
+	try
+	{		
+		*cloud1 += *cloud2;		
+	}
+	catch(std::exception& e)
+	{
+		ROS_ERROR("obstacle_detector:: concatinate  %s",e.what());
+	}
+	
+	pcl::toPCLPointCloud2(*cloud1, returnCloud );		
+
+	return returnCloud;	
+}
+
+
+//applies a voxelgrid filter for the pointcloud input and returns a filtered cloud
+pcl::PCLPointCloud2 voxelfilter(const pcl::PCLPointCloud2ConstPtr& inputCloud)
+{
+	pcl::PCLPointCloud2 outputCloud;
+	pcl::VoxelGrid<pcl::PCLPointCloud2> voxel;
+	voxel.setInputCloud (inputCloud);
+	voxel.setLeafSize (0.01f, 0.01f, 0.01f);
+	voxel.filter (outputCloud);
+	ROS_INFO("Filtered pointCloud from %d to %d",outputCloud.width * outputCloud.height,outputCloud.width * outputCloud.height);
+	return outputCloud;
+}
+
+
+//project the pointcloud (2D or 3D) onto the XYplane (Z=0)
+pcl::PCLPointCloud2 projectOnXYPlane(const pcl::PCLPointCloud2& inputCloud)
+{
+	pcl::PCLPointCloud2 outputCloud;
+	//TODO
+	return outputCloud;
+}
+
+
+//split the input pointcloud into multiple clusters and return them
+vector<pcl::PCLPointCloud2> defineClusters(const pcl::PCLPointCloud2& inputCloud)
+{
+	vector<pcl::PCLPointCloud2> outputClusters;
+	pcl::PCLPointCloud2 clusterCloud;
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZI>);
+	pcl::fromPCLPointCloud2(inputCloud, *cloud);
+	
+	//Creating the KdTree object for the search method of the extraction
+	pcl::search::KdTree<pcl::PointXYZI>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZI>);
+	tree->setInputCloud (cloud);
+
+	std::vector<pcl::PointIndices> cluster_indices;
+  
+	pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
+	ec.setClusterTolerance (0.1); // in meters
+	ec.setMinClusterSize (4);
+	ec.setMaxClusterSize (250000);
+	ec.setSearchMethod (tree);
+	ec.setInputCloud (cloud);
+	ec.extract (cluster_indices);
+
+	for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+	{
+		pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
+		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
+			cloud_cluster->points.push_back (cloud->points[*pit]);
+			cloud_cluster->width = cloud_cluster->points.size ();
+			cloud_cluster->height = 1;
+			cloud_cluster->is_dense = true;	
+		
+		pcl::toPCLPointCloud2(*cloud_cluster, clusterCloud );
+		
+		clusterCloud.header.frame_id = "/map";
+
+		outputClusters.push_back(clusterCloud);	
+	}
+	//ROS_INFO("nr of points: %d", (inputCloud.width * inputCloud.height));
+	//ROS_INFO("nr of clusters: %d", mClusters.size());
+	
+	return outputClusters;
+}
+
+
+//add the inputCloud to the global vector of pointclouds
+void addToEnvironmentCloudSet(const pcl::PCLPointCloud2& inputCloud){
+	boost::mutex::scoped_lock lock(mMutex);
+	mClouds.push_back(inputCloud);
+}
+
+
+//concatinate the available clouds gathered in one loop into one pointcloud
+void constructEnvironmentCloud()
+{
+	//boost::mutex::scoped_lock lock(mMutex);
+
+	pcl::PCLPointCloud2 tmpCloud;
+	for(vector<pcl::PCLPointCloud2>::iterator it = mClouds.begin(); it!= mClouds.end(); ++it)
+	{
+		if (tmpCloud.width * tmpCloud.height == 0)
+		{
+			tmpCloud = (*it); //the first iteration, so cloud is empty. cloud at index 1 = tmpCloud
+		}else
+		{
+			tmpCloud = concatinateClouds(tmpCloud, (*it));
+		}
+	}
+	mCloud = tmpCloud;
+	
+	ROS_INFO("cloud size %d",(mCloud.width * mCloud.height));
+}
+
+
+/* subscribe on the sensor_msgs::PointCloud2 publisher, upon recieve convert to pcl::PCLPointCLoud2.
+ * determine and devide the cloud in multiple clusters for further use.
+ *  
+ * note on pcl conversion
+ * "When subscribing to a pcl::PointCloud<T> topic with a sensor_msgs::PointCloud2 subscriber or viceversa, 
+ * the conversion (deserialization) between the two types sensor_msgs::PointCloud2 and pcl::PointCloud<T> 
+ * is done on the fly by the subscriber."
+ * source: http://wiki.ros.org/pcl/Overview
+ */
+void subClusterDeterminationCallback(const pcl::PCLPointCloud2ConstPtr& msg) 
+{
+	addToEnvironmentCloudSet(*msg);	
+	//mClusters = defineClusters(*msg);
+}
+
+
+//soon to be DEPRECATED
 //detect objects within sensor range, compare to known objects and add/merge in object list
-void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
+void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) 
+{
     // some vars
     const double xySearchDistance = 0.1; // 10cm        //TODO should be settable somewhere 
 	
@@ -240,48 +366,65 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) {
     }    
 }
 
+
 //discard objects outside of certain range, or when a new scan has been done
-void forgetObjects(){
-	if(!MEMORY){	//if runs on actual robot, use only transient data from each laser scan. dont keep objects in memory
-		mObjects.clear();
-	}else{
-		try{
-		Pose currentPose = getCurrentPose();
-		
-		for(vector<PointCloud>::iterator objectIt = mObjects.begin(); objectIt!= mObjects.end(); ++objectIt){
-			for(vector<Point32>::iterator pointIt = (*objectIt).points.begin(); pointIt != (*objectIt).points.end(); ++pointIt){
-				double xyDistance = sqrt(pow(currentPose.position.x - (*pointIt).x,2) + (pow(currentPose.position.y - (*pointIt).y,2)));
-					if (xyDistance > MAX_SENSORDIST){					
-						(*objectIt).points.erase( pointIt--);	//carefull here	!					
-					}
-				}
-				if((*objectIt).points.empty()){
-					mObjects.erase(objectIt--); //careful here!
-				}					
-			}
-		}catch(exception& e){
-			ROS_ERROR("ERROR forgetting objects: %s",e.what());
-		}
-	}
+void forgetObjects()
+{
+	//boost::mutex::scoped_lock lock(mMutex);
+
+	mObjects.clear();
+	mClusters.clear();
+	mClouds.clear();
 }
 
-//publish all known objects
-void publishObjects()	{
-	
+
+//publish deprecated pointcloud type and object msg for backward compatibility during development
+void publishOldData()
+{
+	//boost::mutex::scoped_lock lock(mMutex);
+
+	//publish message for localnav calculations
 	skynav_msgs::Objects msg;
 	msg.objects = mObjects;
-	pubObstacles.publish(msg);
+	pubObstacles.publish(msg);	
 	
-	for(vector<PointCloud>::iterator it = mObjects.begin(); it != mObjects.end(); ++it)	{
+	//publish multiple clouds for visual representation
+	for(vector<PointCloud>::iterator it = mObjects.begin(); it != mObjects.end(); ++it)	
+	{
 		pubObjects.publish( (*it) );
 	}
-	
-	forgetObjects();	
-
 }
 
-int main(int argc, char **argv) {
 
+//publish all known objects
+void publishObjects()
+{		
+	boost::mutex::scoped_lock lock(mMutex);
+
+	publishOldData();
+	
+	constructEnvironmentCloud();
+	
+	//pcl::PCLPointCloud2 outputCloud;
+	
+	//outputCloud = voxelfilter(mCloud);
+	
+	mCloud.header.frame_id = "/map";
+		
+	pubCloud.publish(mCloud);
+		
+	////publish multiple clouds for visual representation
+	//for(vector<pcl::PCLPointCloud2>::iterator pclIt = mClusters.begin(); pclIt!=mClusters.end(); ++pclIt)
+	//{
+		//pubClusters.publish( (*pclIt) );
+	//}
+	
+	forgetObjects();	
+}
+
+
+int main(int argc, char **argv) 
+{
     ros::init(argc, argv, "obstacle_detector");
 
     ros::NodeHandle n("/localnav");
@@ -289,26 +432,28 @@ int main(int argc, char **argv) {
     ros::NodeHandle n_SLAM("/slam");
 
     //pubs
-    pubSensorData = n.advertise<sensor_msgs::PointCloud>("sensor_data", 1024);
     pubObjects = n.advertise<PointCloud>("objects", 1024);
     pubObstacles = n.advertise<skynav_msgs::Objects>("obstacles", 1024);
+    pubClusters = n.advertise<pcl::PCLPointCloud2>("clusters",1024);
+    pubCloud = n.advertise<pcl::PCLPointCloud2>("pointCloud",1024);
 
     //subs
     // TODO: subscribe to pointcloud in base_link frame from sensors and translate to "map" frame for obstacle detection.
     // ros::Subscriber subSensors = n_control.subscribe("sensors", 10, subSensorCallback); // raw unprocessed sensor values
-    ros::Subscriber subSensorData = n.subscribe("sensor_data", 10, subObjectDetectionCallback);
-    ros::Subscriber subLaser = n_control.subscribe("laser_scan", 10, subLaserScanCallback);
+    ros::Subscriber subSensorCloud = n_control.subscribe("cloud", 10, subClusterDeterminationCallback);
+    ros::Subscriber subSensorData = n_control.subscribe("sensor_data", 10, subObjectDetectionCallback);
 
     //services
     servClientCurrentPose = n_SLAM.serviceClient<skynav_msgs::current_pose>("current_pose");
     
     mTransformListener = new tf::TransformListener();
-
+	
     ros::Rate loop_rate(1);
 	
 	while (ros::ok()) {
             
 		ros::spinOnce();
+		//ros::spinOnce();
 		
 		publishObjects();
 		
@@ -316,7 +461,6 @@ int main(int argc, char **argv) {
 	}
             
     delete mTransformListener;
-
 
     return 0;
 }
