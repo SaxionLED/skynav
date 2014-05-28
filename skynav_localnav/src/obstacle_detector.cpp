@@ -60,8 +60,7 @@ set<Point32, compPoint> mSensorData;
 vector<PointCloud> mObjects;				//objects in memory (old)
 
 vector<pcl::PCLPointCloud2> mClusters;		//the set of clusters
-vector<pcl::PCLPointCloud2> mClouds;		//the set of pointclouds received in one loop
-pcl::PCLPointCloud2 mCloud;					//the concatinated pointcloud, created from all received pointclouds in in one loop
+vector<pcl::PCLPointCloud2> mCloudSet;		//the set of pointclouds received in one loop
 
 boost::mutex mMutex;
 
@@ -130,14 +129,14 @@ pcl::PCLPointCloud2 concatinateClouds(const pcl::PCLPointCloud2& inputCloudA, co
 {	
 	pcl::PCLPointCloud2 returnCloud;	
 	
+	//TODO pcl::PCLPointCloud2 does not seem to have operator '+=' even though it is documented by pcl.. needs further investigation
 	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud1 (new pcl::PointCloud<pcl::PointXYZI>);
 	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud2 (new pcl::PointCloud<pcl::PointXYZI>);
-
 	pcl::fromPCLPointCloud2(inputCloudA, *cloud1);
 	pcl::fromPCLPointCloud2(inputCloudB, *cloud2);
 	
 	try
-	{		
+	{	
 		*cloud1 += *cloud2;		
 	}
 	catch(std::exception& e)
@@ -152,14 +151,17 @@ pcl::PCLPointCloud2 concatinateClouds(const pcl::PCLPointCloud2& inputCloudA, co
 
 
 //applies a voxelgrid filter for the pointcloud input and returns a filtered cloud
-pcl::PCLPointCloud2 voxelfilter(const pcl::PCLPointCloud2ConstPtr& inputCloud)
+pcl::PCLPointCloud2 voxelfilter(const pcl::PCLPointCloud2& inputCloud)
 {
+	pcl::PCLPointCloud2ConstPtr InputCloudPtr(new pcl::PCLPointCloud2(inputCloud)); //ugly copy constructor, but seemed neccesary for voxelgrid.setInputCloud() =(
 	pcl::PCLPointCloud2 outputCloud;
+	
 	pcl::VoxelGrid<pcl::PCLPointCloud2> voxel;
-	voxel.setInputCloud (inputCloud);
+	voxel.setInputCloud (InputCloudPtr);
 	voxel.setLeafSize (0.01f, 0.01f, 0.01f);
 	voxel.filter (outputCloud);
-	ROS_INFO("Filtered pointCloud from %d to %d",outputCloud.width * outputCloud.height,outputCloud.width * outputCloud.height);
+	
+	//ROS_INFO("Filtered pointCloud from %d to %d",inputCloud.width * inputCloud.height,outputCloud.width * outputCloud.height);
 	return outputCloud;
 }
 
@@ -220,29 +222,28 @@ vector<pcl::PCLPointCloud2> defineClusters(const pcl::PCLPointCloud2& inputCloud
 //add the inputCloud to the global vector of pointclouds
 void addToEnvironmentCloudSet(const pcl::PCLPointCloud2& inputCloud){
 	boost::mutex::scoped_lock lock(mMutex);
-	mClouds.push_back(inputCloud);
+	mCloudSet.push_back(inputCloud);
 }
 
 
 //concatinate the available clouds gathered in one loop into one pointcloud
-void constructEnvironmentCloud()
+pcl::PCLPointCloud2 constructEnvironmentCloud(const vector<pcl::PCLPointCloud2>& cloudSet)
 {
-	//boost::mutex::scoped_lock lock(mMutex);
+	pcl::PCLPointCloud2 cloud;
 
-	pcl::PCLPointCloud2 tmpCloud;
-	for(vector<pcl::PCLPointCloud2>::iterator it = mClouds.begin(); it!= mClouds.end(); ++it)
+	for(vector<pcl::PCLPointCloud2>::const_iterator it = cloudSet.begin(); it!= cloudSet.end(); ++it)
 	{
-		if (tmpCloud.width * tmpCloud.height == 0)
+		if (cloud.width * cloud.height == 0)
 		{
-			tmpCloud = (*it); //the first iteration, so cloud is empty. cloud at index 1 = tmpCloud
+			cloud = (*it); //the first iteration (so cloud is empty). cloudset[0] is dus basis voor cloud
 		}else
 		{
-			tmpCloud = concatinateClouds(tmpCloud, (*it));
+			cloud = concatinateClouds(cloud, (*it));
 		}
 	}
-	mCloud = tmpCloud;
-	
-	ROS_INFO("cloud size %d",(mCloud.width * mCloud.height));
+	ROS_INFO("cloud size %d",(cloud.width * cloud.height));
+
+	return cloud;
 }
 
 
@@ -370,19 +371,15 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg)
 //discard objects outside of certain range, or when a new scan has been done
 void forgetObjects()
 {
-	//boost::mutex::scoped_lock lock(mMutex);
-
 	mObjects.clear();
 	mClusters.clear();
-	mClouds.clear();
+	mCloudSet.clear();
 }
 
 
 //publish deprecated pointcloud type and object msg for backward compatibility during development
 void publishOldData()
 {
-	//boost::mutex::scoped_lock lock(mMutex);
-
 	//publish message for localnav calculations
 	skynav_msgs::Objects msg;
 	msg.objects = mObjects;
@@ -400,25 +397,19 @@ void publishOldData()
 void publishObjects()
 {		
 	boost::mutex::scoped_lock lock(mMutex);
+	
+	publishOldData(); //for backwards compatibility during development of the working software
 
-	publishOldData();
+	pcl::PCLPointCloud2 cloud;	
+	pcl::PCLPointCloud2 cloud_filtered;
 	
-	constructEnvironmentCloud();
+	cloud = constructEnvironmentCloud(mCloudSet);	
+	cloud_filtered = voxelfilter(cloud);	
 	
-	//pcl::PCLPointCloud2 outputCloud;
+	cloud_filtered.header.frame_id = "/map";		
 	
-	//outputCloud = voxelfilter(mCloud);
-	
-	mCloud.header.frame_id = "/map";
-		
-	pubCloud.publish(mCloud);
-		
-	////publish multiple clouds for visual representation
-	//for(vector<pcl::PCLPointCloud2>::iterator pclIt = mClusters.begin(); pclIt!=mClusters.end(); ++pclIt)
-	//{
-		//pubClusters.publish( (*pclIt) );
-	//}
-	
+	pubCloud.publish(cloud_filtered);
+
 	forgetObjects();	
 }
 
@@ -435,7 +426,7 @@ int main(int argc, char **argv)
     pubObjects = n.advertise<PointCloud>("objects", 1024);
     pubObstacles = n.advertise<skynav_msgs::Objects>("obstacles", 1024);
     pubClusters = n.advertise<pcl::PCLPointCloud2>("clusters",1024);
-    pubCloud = n.advertise<pcl::PCLPointCloud2>("pointCloud",1024);
+    pubCloud = n.advertise<pcl::PCLPointCloud2>("pointCloudData",10);
 
     //subs
     // TODO: subscribe to pointcloud in base_link frame from sensors and translate to "map" frame for obstacle detection.
@@ -453,7 +444,6 @@ int main(int argc, char **argv)
 	while (ros::ok()) {
             
 		ros::spinOnce();
-		//ros::spinOnce();
 		
 		publishObjects();
 		
