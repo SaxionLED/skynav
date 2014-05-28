@@ -4,6 +4,8 @@
 		<node pkg="skynav_control" name="motion_control" type="motion_control" output="screen"/>
 		<node pkg="skynav_control" name="data_verifier" type="data_verifier" output="screen"/>
 		<node pkg="skynav_control" name="waypoint_filter" type="waypoint_filter" output="screen"/>
+		<node pkg="skynav_control" name="laser_receiver" type="laser_receiver" output="screen"/>
+
 	</group>
 	
 	<group ns="slam">
