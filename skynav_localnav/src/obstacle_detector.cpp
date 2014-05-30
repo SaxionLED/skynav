@@ -50,7 +50,7 @@ struct compPoint
 
 int mObjectsFound = 0;
 
-ros::Publisher pubObjects, pubClusters, pubObstacles, pubSensorData, pubSensorData_old, pubCloud;
+ros::Publisher pubObjects, /*pubClusters,*/ pubObstacles, pubSensorData, pubSensorData_old, pubCloud;
 ros::ServiceClient servClientCurrentPose;
 
 laser_geometry::LaserProjection mLaserProjector;
@@ -59,7 +59,8 @@ tf::TransformListener* mTransformListener;
 set<Point32, compPoint> mSensorData;
 vector<PointCloud> mObjects;				//objects in memory (old)
 
-vector<pcl::PCLPointCloud2> mClusters;		//the set of clusters
+//vector<pcl::PCLPointCloud2> mClusters;		//the set of clusters
+
 vector<pcl::PCLPointCloud2> mCloudSet;		//the set of pointclouds received in one loop
 
 boost::mutex mMutex;
@@ -372,7 +373,7 @@ void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg)
 void forgetObjects()
 {
 	mObjects.clear();
-	mClusters.clear();
+//	mClusters.clear();
 	mCloudSet.clear();
 }
 
@@ -425,14 +426,14 @@ int main(int argc, char **argv)
     //pubs
     pubObjects = n.advertise<PointCloud>("objects", 1024);
     pubObstacles = n.advertise<skynav_msgs::Objects>("obstacles", 1024);
-    pubClusters = n.advertise<pcl::PCLPointCloud2>("clusters",1024);
+    //pubClusters = n.advertise<pcl::PCLPointCloud2>("clusters",1024);
     pubCloud = n.advertise<pcl::PCLPointCloud2>("pointCloudData",10);
 
     //subs
     // TODO: subscribe to pointcloud in base_link frame from sensors and translate to "map" frame for obstacle detection.
     // ros::Subscriber subSensors = n_control.subscribe("sensors", 10, subSensorCallback); // raw unprocessed sensor values
     ros::Subscriber subSensorCloud = n_control.subscribe("cloud", 10, subClusterDeterminationCallback);
-    ros::Subscriber subSensorData = n_control.subscribe("sensor_data", 10, subObjectDetectionCallback);
+    //ros::Subscriber subSensorData = n_control.subscribe("sensor_data", 10, subObjectDetectionCallback); //old pointcloud type based laser data
 
     //services
     servClientCurrentPose = n_SLAM.serviceClient<skynav_msgs::current_pose>("current_pose");

@@ -14,6 +14,9 @@
 #include <pcl/point_types.h> 
 #include <pcl/surface/concave_hull.h>
 #include <pcl/surface/convex_hull.h>
+#include <pcl/kdtree/kdtree.h>
+#include <pcl/filters/extract_indices.h>
+#include <pcl/segmentation/extract_clusters.h>
 
 #include <boost/optional.hpp>
 

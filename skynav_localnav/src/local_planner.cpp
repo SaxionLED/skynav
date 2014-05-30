@@ -12,13 +12,14 @@
 using namespace std;
 
 ros::Publisher pubObjectOutlines, pubNavigationState, pubObjectExtremes;
-ros::Subscriber subObstacles, subNavigationState, subAbsoluteTargetPose;
+ros::Subscriber subObstacles, subNavigationState, subAbsoluteTargetPose, subPointCloudSensorData;
 
 ros::ServiceServer servServerWaypointCheck;
 ros::ServiceClient servClientCurrentPose;
 
 vector<PointCloud> mObstacles;					//pointclouds that make up the objects
 vector<PointCloud> mObjectOutlines;			//outline of known objects, calculated by the convex / concave hull function
+vector<pcl::PCLPointCloud2> mClusters;		//set of clusters(objects) 
 
 PoseStamped mCurrentAbsoluteTargetPose;			//the current next target pose, as published by motion_control
 uint8_t mControl_NavigationState;				//the state which motion_control is in.
@@ -44,6 +45,69 @@ Pose getCurrentPose() {
 		ros::shutdown();
 	}
 }
+
+
+
+//split the input pointcloud into multiple clusters and return them
+vector<pcl::PCLPointCloud2> defineClusters(const pcl::PCLPointCloud2& inputCloud)
+{
+	vector<pcl::PCLPointCloud2> outputClusters;
+	pcl::PCLPointCloud2 clusterCloud;
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZI>);
+	pcl::fromPCLPointCloud2(inputCloud, *cloud);
+	
+	//Creating the KdTree object for the search method of the extraction
+	pcl::search::KdTree<pcl::PointXYZI>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZI>);
+	tree->setInputCloud (cloud);
+
+	std::vector<pcl::PointIndices> cluster_indices;
+  
+	pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
+	ec.setClusterTolerance (0.1); // in meters
+	ec.setMinClusterSize (4);
+	ec.setMaxClusterSize (250000);
+	ec.setSearchMethod (tree);
+	ec.setInputCloud (cloud);
+	ec.extract (cluster_indices);
+
+	for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
+	{
+		pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
+		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
+			cloud_cluster->points.push_back (cloud->points[*pit]);
+			cloud_cluster->width = cloud_cluster->points.size ();
+			cloud_cluster->height = 1;
+			cloud_cluster->is_dense = true;	
+		
+		pcl::toPCLPointCloud2(*cloud_cluster, clusterCloud );
+		
+		clusterCloud.header.frame_id = "/map";
+
+		outputClusters.push_back(clusterCloud);	
+	}
+	ROS_INFO("nr of points: %d", (inputCloud.width * inputCloud.height));
+	ROS_INFO("nr of clusters: %d", mClusters.size());
+	
+	return outputClusters;
+}
+
+
+//receive a pcl::PCLPointCloud2 and perform some actions on it
+void subPointCloudDataCallback(const pcl::PCLPointCloud2ConstPtr& msg)
+{
+	
+	mClusters.clear();
+	mClusters = defineClusters(*msg);
+	//TODO 
+	/*
+	 * 
+	 */
+}
+
+
+
+
+
 
 //publish the outer hull pointclouds
 void publishHull(){
@@ -161,11 +225,11 @@ int main(int argc, char **argv) {
     pubNavigationState = n_control.advertise<std_msgs::UInt8>("navigation_state_interrupt", 0);
     pubObjectExtremes = n.advertise<PointCloud>("obstacleExtremes",2);
     
-
     //subs
     subObstacles = n.subscribe("obstacles", 10, subObstaclesCallback);
 	subNavigationState= n_control.subscribe("navigation_state",0,subNavigationStateCallback);
 	subAbsoluteTargetPose = n_control.subscribe("target_pose",0,subAbsoluteTargetPoseCallback);
+	subPointCloudSensorData = n.subscribe("pointCloudData",1,subPointCloudDataCallback);
 	
 	//services
     servServerWaypointCheck = n.advertiseService("path_check", servServerWaypointCheckCallback);
