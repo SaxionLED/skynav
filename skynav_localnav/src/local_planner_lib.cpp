@@ -160,7 +160,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 		
 		if (!intersectFound)
 		{
-			//ROS_INFO("left  extreme at (%f, %f)", obstacleExtremeLeft.x, obstacleExtremeLeft.y);
+			ROS_INFO("left  extreme at (%f, %f)", obstacleExtremeLeft.x, obstacleExtremeLeft.y);
 			break; // stop at first empty, previous hit was the extreme
 		}	
 		obstacleExtremeLeft = intersection;
@@ -217,7 +217,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 		
 		if (!intersectFound)
 		{
-			//ROS_INFO("right  extreme at (%f, %f)", obstacleExtremeRight.x, obstacleExtremeRight.y);
+			ROS_INFO("right  extreme at (%f, %f)", obstacleExtremeRight.x, obstacleExtremeRight.y);
 			break; // stop at first empty, previous hit was the extreme
 		}	
 		obstacleExtremeRight = intersection;		
@@ -293,7 +293,7 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 	}
 	
 	//Hack calculate the point further along the same angle, for colission detection when the object is wider than known at the moment
-	distNewP = distNewP+0.2;
+	distNewP = distNewP;
 	
 	//VII calculate x and y coordinates of the new waypoint, based on distance and angle from current pos
 	nwTarget.x = truncateValue(	currentPos.x + cos(angleNewP) * distNewP	);

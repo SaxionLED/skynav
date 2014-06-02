@@ -8,7 +8,10 @@
 #include <geometry_msgs/Point32.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Pose.h>
+
 #include <sensor_msgs/PointCloud.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/point_cloud_conversion.h>
 
 #include <pcl_ros/point_cloud.h>
 #include <pcl/point_types.h> 
@@ -19,6 +22,8 @@
 #include <pcl/segmentation/extract_clusters.h>
 
 #include <boost/optional.hpp>
+#include <boost/thread/mutex.hpp>
+
 
 #define ROBOTRADIUS 		1 		//the radius of the robot. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 		4		//the outer range of the sensors TODO get this from laser sensor dependent

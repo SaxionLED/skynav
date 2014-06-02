@@ -6,7 +6,6 @@ find_package(catkin REQUIRED COMPONENTS message_generation std_msgs geometry_msg
 add_message_files(
   FILES
   Object.msg
-  Objects.msg
   Point32Stamped.msg
   Pose2DArray.msg
   TimedPose.msg
@@ -15,6 +14,7 @@ add_message_files(
   user_init.msg
   user_input_mapInit.msg
   user_input_query.msg
+  PointCloudVector.msg
 )
 
 add_service_files(
@@ -36,7 +36,6 @@ generate_messages(
   geometry_msgs
   sensor_msgs
 )
-
 
 catkin_package(
 	CATKIN_DEPENDS geometry_msgs nav_msgs std_msgs sensor_msgs
