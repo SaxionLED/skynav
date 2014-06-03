@@ -1,15 +1,8 @@
 #include <ros/ros.h>
 
-#include <sensor_msgs/Range.h>
-#include <sensor_msgs/PointCloud.h>
 #include <sensor_msgs/PointCloud2.h>
-#include <sensor_msgs/LaserScan.h>
-
-#include <geometry_msgs/Point32.h>
 #include <geometry_msgs/Pose.h>
-
 #include <skynav_msgs/current_pose.h>
-#include <skynav_msgs/Object.h>
 #include <skynav_msgs/PointCloudVector.h>
 
 #include <pcl_ros/point_cloud.h>
@@ -24,40 +17,17 @@
 #include <pcl/PCLPointCloud2.h>
 
 #include <boost/thread/mutex.hpp>
-#include <set>
-#include <laser_geometry/laser_geometry.h>
 #include <tf/transform_listener.h>
-
-#define ROBOTRADIUS 					0.5 	//the radius of the robot in meters. TODO get this from somewhere robot dependent
-#define MAX_SENSORDIST 					4		//the outer range of the sensors in meters
+#include <ros/package.h>
 
 using namespace std;
 using namespace geometry_msgs;
 using namespace sensor_msgs;
 
-struct compPoint 
-{
-    bool operator() (const Point32& first, const Point32& second) const {
-        if (first.x < second.x)
-            return true;
-        else if (first.x > second.x)
-            return false;
-        else // if x the same
-            if (first.y < second.y)
-            return true;
-        else
-            return false; // if x the same and y the same or second y greater
-    }
-};
-
-ros::Publisher pubObjects,pubObstacles, pubSensorData, pubSensorData_old, pubCloud, pubCloudRaw, pubPCVector;
+ros::Publisher pubSensorData, pubCloud, pubCloudRaw, pubPCVector;
 ros::ServiceClient servClientCurrentPose;
 
-laser_geometry::LaserProjection mLaserProjector;
 tf::TransformListener* mTransformListener;
-
-set<Point32, compPoint> mSensorData;
-vector<PointCloud> mObjects;				//objects in memory (old)
 
 vector<pcl::PCLPointCloud2> mCloudSet;		//the set of pointclouds received in one loop
 
@@ -79,47 +49,6 @@ Pose getCurrentPose()
     }
 
     return currentPose;
-}
-
-
-//determine if a point already exist in a list of points.
-static bool pointExists(const Point32* a, vector<Point32>* vec) {
-	const double xyRange = 0.02; //within 2 cm, it is concidered the same coordinate
-    vector<Point32>::iterator it;
-
-    for (it = vec->begin(); it != vec->end(); ++it) {
-		
-		
-		if(((*it).x == a->x && (*it).y == a->y)){	//point coordinates are exactly the same
-            return true;
-		}
-		
-		double xyDistance = sqrt(pow((*it).x - a->x,2) + (pow((*it).y - a->y,2)));
-		if (xyDistance <= xyRange){					//point exist by close proximity ( taken accuracy of sensor in consideration)
-			return true;							
-		}
-    }	
-
-    return false;									//point does not already exist
-}
-
-
-//determine if two points are within a certain distance to eachother
-static bool pointInRange(const Point32* a, const Point32* b, const double searchDistance) 
-{
-		double xyDistance = sqrt(pow((a->x -b->x),2) + pow((a->y - b->y),2));	//use pythagoras to determine if coordinates of a are within certain range of b
-		if(xyDistance <= searchDistance)
-		{														
-			return true;
-		}  		  
-    return false;
-}
-
-
-//truncate values (in meters) to mm precision
-float truncateValue(const float value)
-{
-	return floorf(value*1000)/1000; //mm
 }
 
 
@@ -263,114 +192,9 @@ void subPointCloudDataCallback(const pcl::PCLPointCloud2ConstPtr& msg)
 }
 
 
-//soon to be DEPRECATED
-//detect objects within sensor range, compare to known objects and add/merge in object list
-void subObjectDetectionCallback(const sensor_msgs::PointCloud::ConstPtr& msg) 
-{
-    // some vars
-    const double xySearchDistance = 0.1; // 10cm        //TODO should be settable somewhere 
-	
-    // now we can check our newest points with the ones already in memory, find other points that are nearby and points near the found points
-    for (uint i = 0; i < msg->points.size(); ++i) {
-    
-        PointCloud foundPoints;
-		set<Point32>::iterator sensor_it;
-
-        // check if objects were found nearby
-        vector<PointCloud>::iterator firstObjectIt;
-
-        for (firstObjectIt = mObjects.begin(); firstObjectIt != mObjects.end(); ++firstObjectIt) {
-
-            for (uint firstPoints = 0; firstPoints < (*firstObjectIt).points.size(); ++firstPoints) {  
-                
-                if( pointInRange(&((*firstObjectIt).points.at(firstPoints)), &(msg->points.at(i)), xySearchDistance))   { // if point within range of another point
-                
-                    // if true, the coordinate is within xySearchDistance of any of the coordinates contained in the object and we should add it to that object
-                    bool addOriginalPoint = true;
-
-                    if (pointExists(&(msg->points.at(i)), &((*firstObjectIt).points))) { // do not add duplicates
-                        addOriginalPoint = false; // point is already in the object, prevent adding it twice 
-                    }
-
-                    // point is added to object, now check if the point is also in range of another object
-                    vector<PointCloud>::iterator secondObjectIt;
-
-                    for (secondObjectIt = firstObjectIt + 1; secondObjectIt != mObjects.end();) {
-                        bool erasedObject = false;
-
-                        for (uint secondPoints = 0; secondPoints < (*secondObjectIt).points.size(); ++secondPoints) {
-                            if( pointInRange(&((*secondObjectIt).points.at(secondPoints)), &(msg->points.at(i)), xySearchDistance))   {
-                            
-                                // another object in range was found
-
-                                // to prevent the original point being added twice
-                                if (pointExists( &(msg->points.at(i)), &((*secondObjectIt).points))) { // do not add duplicates
-                                    addOriginalPoint = false;
-                                }
-
-                                // merge the two objects
-                                (*firstObjectIt).points.insert((*firstObjectIt).points.end(), (*secondObjectIt).points.begin(), (*secondObjectIt).points.end()); // add all points from 2nd vector to the first
-                                (*secondObjectIt).points.clear(); // empty vector
-
-                                erasedObject = true;
-                                secondObjectIt = mObjects.erase(secondObjectIt); // remove locally, can re-use the index for it
-                                //ROS_INFO("merged objects");
-
-                                break; // if point is in range, this needs not be executed again for that object
-
-                                // repeat until all objects have been checked
-                            }
-                        }
-
-                        if (!erasedObject) {
-                            ++secondObjectIt;
-                        }
-                    }
-
-                    if (addOriginalPoint) {
-                        (*firstObjectIt).points.push_back(msg->points.at(i));
-                    }
-
-                    goto nextNewPoint;	//point has been processed. jump to next point in pointcloud
-                }
-            }
-        }
-
-        // no objects nearby were found, check if there are any single points nearby to create a new object out of
-
-        for (sensor_it = mSensorData.begin(); sensor_it != mSensorData.end(); ++sensor_it) {
-			
-			if( pointInRange( &(*sensor_it), &(msg->points.at(i)), xySearchDistance))   {       //if point near other point
-                foundPoints.points.push_back((*sensor_it));
-                mSensorData.erase(sensor_it--); // is this safe?
-                }
-        }
-
-        if (foundPoints.points.size() > 0) { // if points were found nearby
-
-            foundPoints.points.push_back(msg->points.at(i)); // add the reference point, since it was not added anywhere yet
-            
-            foundPoints.header.stamp = ros::Time(0);
-            foundPoints.header.frame_id = "/map";
-            
-            mObjects.push_back(foundPoints);
-
-        } else { // no nearby points found
-            // if no object found either, save the point for future searching
-            mSensorData.insert(msg->points.at(i)); // note that a set is used because this prevents duplicates
-        }
-        
-        // this skips everything and restarts the first for loop. should only be called when a new point (from msg) has been added to an object.
-        nextNewPoint:
-        asm("NOP");        
-    }    
-}
-
-
 //discard objects outside of certain range, or when a new scan has been done
 void forgetObjects()
 {
-	mObjects.clear();
 	mCloudSet.clear();
 }
 
@@ -381,7 +205,7 @@ void writeOutputPCD(const pcl::PCLPointCloud2& inputCloud)
 	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZI>);
 	pcl::fromPCLPointCloud2(inputCloud, *cloud);
 	try{
-		pcl::io::savePCDFileASCII ("PCD_TESTFILE.pcd", *cloud);
+		pcl::io::savePCDFileASCII (ros::package::getPath("skynav_localnav")+"/export/EXPORT.pcd", *cloud);
 	}catch(std::exception& e){
 		ROS_ERROR("obstacle_detector %s",e.what());
 	}	
@@ -423,8 +247,7 @@ void publishObjects()
 		msg.clouds.push_back(cluster);
 	}
 	pubPCVector.publish(msg);
-	
-	
+		
 	//clean up data
 	forgetObjects();	
 
@@ -442,7 +265,6 @@ int main(int argc, char **argv)
     ros::NodeHandle n_SLAM("/slam");
 
     //pubs
-    pubObjects = n.advertise<PointCloud>("objects", 1024);
     pubPCVector = n.advertise<skynav_msgs::PointCloudVector>("pointcloudVector",1);
     
     pubCloud = n.advertise<pcl::PCLPointCloud2>("pointCloudData",10);
@@ -452,9 +274,6 @@ int main(int argc, char **argv)
         ros::Subscriber subSensorCloud = n_control.subscribe("cloud", 10, subPointCloudDataCallback);
     // TODO: subscribe to pointcloud in base_link frame from sensors and translate to "map" frame for obstacle detection.
     
-    // ros::Subscriber subSensors = n_control.subscribe("sensors", 10, subSensorCallback); // raw unprocessed sensor values
-    //ros::Subscriber subSensorData = n_control.subscribe("sensor_data", 10, subObjectDetectionCallback); //old pointcloud type based laser data
-
     //services
     servClientCurrentPose = n_SLAM.serviceClient<skynav_msgs::current_pose>("current_pose");
     

@@ -2,7 +2,6 @@
 
 #include <skynav_msgs/waypoint_check.h>
 #include <skynav_msgs/current_pose.h>
-#include <skynav_msgs/Object.h>
 #include <skynav_msgs/PointCloudVector.h>
 
 
