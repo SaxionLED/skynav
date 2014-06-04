@@ -53,7 +53,8 @@ void subLaserScanCallback(const LaserScan::ConstPtr& scan_in)
 void subLaserScanCallback2(const sensor_msgs::LaserScan::ConstPtr& scan_in)
 {
 
-	 if(!mTransformListener->waitForTransform(scan_in->header.frame_id, "/map", scan_in->header.stamp + ros::Duration().fromSec(scan_in->ranges.size()*scan_in->time_increment), ros::Duration(1.0)))	{
+	if(!mTransformListener->waitForTransform(scan_in->header.frame_id, "/map", scan_in->header.stamp + ros::Duration().fromSec(scan_in->ranges.size()*scan_in->time_increment), ros::Duration(1.0)))
+	{
 		return;
 	}	
 
@@ -67,8 +68,8 @@ void subLaserScanCallback2(const sensor_msgs::LaserScan::ConstPtr& scan_in)
 		ROS_ERROR("obstacle_detector - %s", e.what());
 	}
 
-	if (pointCloud.points.size() > 0) {
-
+	if (pointCloud.points.size() > 0) 
+	{
         pointCloud.header.stamp = ros::Time::now();
         pointCloud.header.frame_id = "/map";
 
@@ -95,9 +96,11 @@ int main(int argc, char **argv) {
 
     
 	mTransformListener = new tf::TransformListener();
-
-    ros::spin();
 	
+	while(ros::ok())
+	{
+		ros::spin();
+	}
     return 0;
 }
 

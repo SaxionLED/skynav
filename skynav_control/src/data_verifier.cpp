@@ -124,9 +124,10 @@ int main(int argc, char **argv) {
 	//services
     servClientCurrentPose = n_SLAM.serviceClient<skynav_msgs::current_pose>("current_pose");
     
-    
-    ros::spin();
-	
+	while(ros::ok())
+	{
+		ros::spin();
+	}
 
     return 0;
 }
