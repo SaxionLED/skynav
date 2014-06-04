@@ -28,20 +28,20 @@ bool compare_Point(Point p, Point q)
 PointCloud convex_hull(PointCloud data)
 {
 	PointCloud PC;
-	pclPointCloudXYZ::Ptr cloud_in(new pclPointCloudXYZ);
-	pclPointCloudXYZ::Ptr cloud_out(new pclPointCloudXYZ);
-	pcl::ConvexHull<pclPoint> chull;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::ConvexHull<pcl::PointXYZ> chull;
 	
 	for(vector<Point32>::iterator it = data.points.begin(); it!= data.points.end(); ++it)
 	{
-		cloud_in->push_back(pclPoint((*it).x,(*it).y,0));
+		cloud_in->push_back(pcl::PointXYZ((*it).x,(*it).y,0));
 	}
 	
 	chull.setInputCloud (cloud_in);
 	chull.setDimension(2);
 	chull.reconstruct (*cloud_out);
 	
-	for(pclPointCloudXYZ::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it)
+	for(pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it)
 	{
 		Point32 p;
 		p.x=(*it).x;
@@ -57,20 +57,20 @@ PointCloud convex_hull(PointCloud data)
 PointCloud concave_hull(PointCloud data)
 {
 	PointCloud PC;
-	pclPointCloudXYZ::Ptr cloud_in(new pclPointCloudXYZ);
-	pclPointCloudXYZ::Ptr cloud_out(new pclPointCloudXYZ);
-	pcl::ConcaveHull<pclPoint> chull;
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::ConcaveHull<pcl::PointXYZ> chull;
 	
 	for(vector<Point32>::iterator it = data.points.begin(); it!= data.points.end(); ++it)
 	{
-		cloud_in->push_back(pclPoint((*it).x,(*it).y,0));
+		cloud_in->push_back(pcl::PointXYZ((*it).x,(*it).y,0));
 	}
 	
 	chull.setInputCloud (cloud_in);
 	chull.setAlpha (0.5);
 	chull.reconstruct (*cloud_out);
 	
-	for(pclPointCloudXYZ::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it)
+	for(pcl::PointCloud<pcl::PointXYZ>::iterator it = cloud_out->begin(); it!= cloud_out->end(); ++it)
 	{
 		Point32 p;
 		p.x=(*it).x;

@@ -1,8 +1,8 @@
 #include <ros/ros.h>
+#include <ros/package.h>
 
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/Pose.h>
-#include <skynav_msgs/current_pose.h>
 #include <skynav_msgs/PointCloudVector.h>
 
 #include <pcl_ros/point_cloud.h>
@@ -18,7 +18,6 @@
 
 #include <boost/thread/mutex.hpp>
 #include <tf/transform_listener.h>
-#include <ros/package.h>
 
 using namespace std;
 using namespace geometry_msgs;
@@ -32,50 +31,6 @@ tf::TransformListener* mTransformListener;
 vector<pcl::PCLPointCloud2> mCloudSet;		//the set of pointclouds received in one loop
 
 boost::mutex mMutex;
-
-Pose getCurrentPose() 
-{
-    Pose currentPose;
-
-    skynav_msgs::current_pose poseService;
-
-    if (servClientCurrentPose.call(poseService)) {
-
-        currentPose = poseService.response.pose;
-
-        //        ROS_INFO("Current pose (x %f) (y %f) (theta %f)", poseService.response.pose.x, poseService.response.pose.y, poseService.response.pose.theta);
-    } else {
-        ROS_ERROR("Failed to call current_pose service from obstacle detector");
-    }
-
-    return currentPose;
-}
-
-
-//concatinate the two pointclouds and return this pointcloud
-pcl::PCLPointCloud2 concatinateClouds(const pcl::PCLPointCloud2& inputCloudA, const pcl::PCLPointCloud2& inputCloudB)
-{	
-	pcl::PCLPointCloud2 returnCloud;	
-	
-	//TODO pcl::PCLPointCloud2 does not seem to have operator '+=' even though it is documented by pcl.. needs further investigation
-	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud1 (new pcl::PointCloud<pcl::PointXYZI>);
-	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud2 (new pcl::PointCloud<pcl::PointXYZI>);
-	pcl::fromPCLPointCloud2(inputCloudA, *cloud1);
-	pcl::fromPCLPointCloud2(inputCloudB, *cloud2);
-	
-	try
-	{	
-		*cloud1 += *cloud2;		
-	}
-	catch(std::exception& e)
-	{
-		ROS_ERROR("obstacle_detector:: concatinate  %s",e.what());
-	}
-	
-	pcl::toPCLPointCloud2(*cloud1, returnCloud );		
-
-	return returnCloud;	
-}
 
 
 //applies a voxelgrid filter for the pointcloud input and returns a filtered cloud
@@ -94,17 +49,8 @@ pcl::PCLPointCloud2 voxelfilter(const pcl::PCLPointCloud2& inputCloud)
 }
 
 
-//project the pointcloud (2D or 3D) onto the XYplane (Z=0)
-pcl::PCLPointCloud2 projectOnXYPlane(const pcl::PCLPointCloud2& inputCloud)
-{
-	pcl::PCLPointCloud2 outputCloud;
-	//TODO
-	return outputCloud;
-}
-
-
-//split the input pointcloud into multiple clusters and return them
-vector<pcl::PCLPointCloud2> defineClusters(const pcl::PCLPointCloud2& inputCloud)
+//determine and extract clusters from the input cloud and return them
+vector<pcl::PCLPointCloud2> extractClusters(const pcl::PCLPointCloud2& inputCloud)
 {
 	vector<pcl::PCLPointCloud2> outputClusters;
 	pcl::PCLPointCloud2 clusterCloud;
@@ -145,14 +91,48 @@ vector<pcl::PCLPointCloud2> defineClusters(const pcl::PCLPointCloud2& inputCloud
 	}
 	//ROS_INFO("nr of clusters: %d", outputClusters.size());
 	
+	//if no seperate clusters could be extracted, return a vector containing the full cloud
+	if(outputClusters.empty())
+	{
+		outputClusters.push_back(inputCloud);
+	}
+	
 	return outputClusters;
 }
 
 
-//add the inputCloud to the global vector of pointclouds
-void addToEnvironmentCloudSet(const pcl::PCLPointCloud2& inputCloud){
-	boost::mutex::scoped_lock lock(mMutex);
-	mCloudSet.push_back(inputCloud);
+//concatinate the two pointclouds and return the concatinated pointcloud
+pcl::PCLPointCloud2 concatinateClouds(const pcl::PCLPointCloud2& inputCloudA, const pcl::PCLPointCloud2& inputCloudB)
+{	
+	pcl::PCLPointCloud2 returnCloud;	
+	
+	//TODO pcl::PCLPointCloud2 does not seem to have operator '+=' even though it is documented by pcl.. needs further investigation
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud1 (new pcl::PointCloud<pcl::PointXYZI>);
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud2 (new pcl::PointCloud<pcl::PointXYZI>);
+	pcl::fromPCLPointCloud2(inputCloudA, *cloud1);
+	pcl::fromPCLPointCloud2(inputCloudB, *cloud2);
+	
+	try
+	{	
+		*cloud1 += *cloud2;		
+	}
+	catch(std::exception& e)
+	{
+		ROS_ERROR("obstacle_detector:: concatinate  %s",e.what());
+	}
+	
+	pcl::toPCLPointCloud2(*cloud1, returnCloud );		
+
+	return returnCloud;	
+}
+
+
+//project the pointcloud (2D or 3D) onto the XYplane (Z=0)
+pcl::PCLPointCloud2 projectOnXYPlane(const pcl::PCLPointCloud2& inputCloud)
+{
+	pcl::PCLPointCloud2 outputCloud;
+	//TODO
+	return outputCloud;
 }
 
 
@@ -165,7 +145,7 @@ pcl::PCLPointCloud2 constructEnvironmentCloud(const vector<pcl::PCLPointCloud2>&
 	{
 		if (cloud.width * cloud.height == 0)
 		{
-			cloud = (*it); //the first iteration (so cloud is empty). cloudset[0] is dus basis voor cloud
+			cloud = (*it); //the first iteration (so cloud is empty). Cloudset[0] is the basecloud
 		}else
 		{
 			cloud = concatinateClouds(cloud, (*it));
@@ -174,28 +154,6 @@ pcl::PCLPointCloud2 constructEnvironmentCloud(const vector<pcl::PCLPointCloud2>&
 	//ROS_INFO("cloud size %d",(cloud.width * cloud.height));
 
 	return cloud;
-}
-
-
-/* subscribe on the sensor_msgs::PointCloud2 publisher, upon recieve convert to pcl::PCLPointCLoud2.
- * determine and devide the cloud in multiple clusters for further use.
- *  
- * note on pcl conversion
- * "When subscribing to a pcl::PointCloud<T> topic with a sensor_msgs::PointCloud2 subscriber or viceversa, 
- * the conversion (deserialization) between the two types sensor_msgs::PointCloud2 and pcl::PointCloud<T> 
- * is done on the fly by the subscriber."
- * source: http://wiki.ros.org/pcl/Overview
- */
-void subPointCloudDataCallback(const pcl::PCLPointCloud2ConstPtr& msg) 
-{
-	addToEnvironmentCloudSet(*msg);	
-}
-
-
-//discard objects outside of certain range, or when a new scan has been done
-void forgetObjects()
-{
-	mCloudSet.clear();
 }
 
 
@@ -209,6 +167,13 @@ void writeOutputPCD(const pcl::PCLPointCloud2& inputCloud)
 	}catch(std::exception& e){
 		ROS_ERROR("obstacle_detector %s",e.what());
 	}	
+}
+
+
+//discard objects outside of certain range, or when a new scan has been done
+void forgetObjects()
+{
+	mCloudSet.clear();
 }
 
 
@@ -234,7 +199,7 @@ void publishObjects()
 	pubCloud.publish(cloud_filtered);
 
 	//publish clusters	
-	cloud_clusters = defineClusters(cloud_filtered);
+	cloud_clusters = extractClusters(cloud_filtered);
 	
 	//publish vector of pointcloud2. TODO these converstions are dirty and unwanted!
 	for(vector<pcl::PCLPointCloud2>::iterator it = cloud_clusters.begin();it!=cloud_clusters.end();++it)
@@ -256,14 +221,35 @@ void publishObjects()
 }
 
 
+//add the inputCloud to the global vector of pointclouds
+void addToEnvironmentCloudSet(const pcl::PCLPointCloud2& inputCloud){
+	boost::mutex::scoped_lock lock(mMutex);
+	mCloudSet.push_back(inputCloud);
+}
+
+
+/* subscribe on the sensor_msgs::PointCloud2 publisher, upon recieve convert to pcl::PCLPointCLoud2.
+ * determine and devide the cloud in multiple clusters for further use.
+ *  
+ * note on pcl conversion
+ * "When subscribing to a pcl::PointCloud<T> topic with a sensor_msgs::PointCloud2 subscriber or viceversa, 
+ * the conversion (deserialization) between the two types sensor_msgs::PointCloud2 and pcl::PointCloud<T> 
+ * is done on the fly by the subscriber."
+ * source: http://wiki.ros.org/pcl/Overview
+ */
+void subPointCloudDataCallback(const pcl::PCLPointCloud2ConstPtr& msg) 
+{
+	addToEnvironmentCloudSet(*msg);	
+}
+
+
 int main(int argc, char **argv) 
 {
     ros::init(argc, argv, "obstacle_detector");
 
     ros::NodeHandle n("/localnav");
     ros::NodeHandle n_control("/control");
-    ros::NodeHandle n_SLAM("/slam");
-
+ 
     //pubs
     pubPCVector = n.advertise<skynav_msgs::PointCloudVector>("pointcloudVector",1);
     
@@ -271,11 +257,8 @@ int main(int argc, char **argv)
     pubCloudRaw = n.advertise<pcl::PCLPointCloud2>("pointCloudDataRaw",10);
 
     //subs
-        ros::Subscriber subSensorCloud = n_control.subscribe("cloud", 10, subPointCloudDataCallback);
+	ros::Subscriber subSensorCloud = n_control.subscribe("cloud", 10, subPointCloudDataCallback);
     // TODO: subscribe to pointcloud in base_link frame from sensors and translate to "map" frame for obstacle detection.
-    
-    //services
-    servClientCurrentPose = n_SLAM.serviceClient<skynav_msgs::current_pose>("current_pose");
     
     mTransformListener = new tf::TransformListener();
 	

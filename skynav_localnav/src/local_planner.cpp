@@ -71,9 +71,7 @@ void subPCVectorCallback(const skynav_msgs::PointCloudVector::ConstPtr& msg)
 		 sensor_msgs::convertPointCloud2ToPointCloud((*it),pc);
 		 
 		 mObstacles.push_back(pc);
-	}
-	
-	//ROS_INFO("received clusters %d", mObstacles.size());
+	}	
 }
 
 
@@ -102,18 +100,15 @@ void hullFunction(){
 			mObjectOutlines.push_back((*it));
 		}
 	}
-	//publish the outer hulls of the known objects
 	publishHull();
 }
 
 void subNavigationStateCallback(const std_msgs::UInt8& msg ){
 	mControl_NavigationState = msg.data;
-	//ROS_INFO("localnav NavigationState: %d", msg.data);	
 }
 
 void subAbsoluteTargetPoseCallback(const PoseStamped& msg){
 	mCurrentAbsoluteTargetPose = msg;
-	//ROS_INFO("Current Localnav target pose: (%f,%f)", msg.pose.position.x, msg.pose.position.y);
 }
 
 // receive the two coordinates that make up the current path and check for colission with known objects.

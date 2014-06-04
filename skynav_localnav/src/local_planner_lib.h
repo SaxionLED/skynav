@@ -28,8 +28,6 @@
 #define ROBOTRADIUS 		1 		//the radius of the robot. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 		4		//the outer range of the sensors TODO get this from laser sensor dependent
 
-typedef pcl::PointXYZ pclPoint;
-typedef pcl::PointCloud<pclPoint> pclPointCloudXYZ;
 typedef sensor_msgs::PointCloud PointCloud;
 typedef geometry_msgs::Point Point;
 typedef geometry_msgs::Point32 Point32;
