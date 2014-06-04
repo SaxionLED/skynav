@@ -1,0 +1,6 @@
+<launch>
+
+	<test test-name="test_obstacle_detector"  pkg="skynav_tests" type="test_obstacle_detector"  name="test_obstacle_detector" time-limit="180" >
+    </test>
+    
+</launch>

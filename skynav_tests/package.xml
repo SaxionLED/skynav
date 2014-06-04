@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<package>
+	<name>skynav_tests</name>
+	<version>0.0.0</version>
+	<description>skynav_tests</description>
+	<maintainer email="j.a.voskes@saxion.nl">J.A.Voskes</maintainer>
+
+	<license>BSD</license>
+	
+	<buildtool_depend>catkin</buildtool_depend>
+	
+   	<build_depend>roscpp</build_depend>
+	<build_depend>tf</build_depend>
+	<build_depend>pcl_ros</build_depend>
+	<build_depend>rostest</build_depend>
+	
+	<run_depend>roscpp</run_depend>
+	<run_depend>tf</run_depend>
+	<run_depend>pcl_ros</run_depend>
+	<build_depend>rostest</build_depend>
+
+</package>
+
+

@@ -1,0 +1,6 @@
+<launch>
+
+	<test test-name="test_local_planner"  pkg="skynav_tests" type="test_local_planner"  name="test_local_planner" time-limit="180" >
+    </test>
+    
+</launch>
