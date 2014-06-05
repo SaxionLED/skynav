@@ -1,0 +1,10 @@
+<launch>
+
+	<include file="$(find skynav_tests)/launch/static_publisher.launch"/>
+	
+	<include file="$(find skynav_bringup)/launch/localnav/localnav.launch"/>
+	<include file="$(find skynav_bringup)/launch/control.launch"/>	
+	
+	<include file="$(find skynav_tests)/launch/test_OD.test"/>
+    
+</launch>
