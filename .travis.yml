@@ -40,7 +40,6 @@ script:
   - cd ~/skynav_ws
   - catkin_make
   - catkin_make tests
-  - cd build
-  - make run_tests
+  - catkin_make run_tests
 
 
