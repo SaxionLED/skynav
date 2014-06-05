@@ -1,6 +1,7 @@
 
 #include <gtest/gtest.h>
 #include <local_planner_lib.h>
+#include "test_localplanner.h"
 
 TEST(LocalPlannerLibTestSuite, testCalcDistance)
 {
@@ -24,7 +25,11 @@ TEST(LocalPlannerLibTestSuite, testTruncatValue)
 TEST(LocalNavTestSuite, testConvexHull)
 {
     // pass
+    //sensor_msgs::PointCloud input = read(ros::package::getPath("skynav_tests")+"/include/testcases/testCase2D.pcd");    
+    //sensor_msgs::PointCloud chull = convex_hull(input); 
+    //sensor_msgs::PointCloud ref	= read(ros::package::getPath("skynav_tests")+"/include/testcases/testCase2D_solution.pcd");   
 }
+
 
 TEST(LocalNavTestSuite, testConcaveHull)
 {
@@ -36,10 +41,12 @@ TEST(LocalNavTestSuite, testRecursiveBug)
     // pass
 }
 
+
 TEST(LocalNavTestSuite, testWayPointCheck)
 {
     // pass
 }
+
 
 int main(int argc, char **argv)
 {
