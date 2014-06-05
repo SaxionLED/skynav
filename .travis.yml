@@ -34,7 +34,8 @@ install:
   - ln -s $CI_SOURCE_PATH . # link repo under test.
   - git clone https://github.com/SaxionLED/x80sv.git
 before_script:
-  - source /opt/ros/hydro/setup.bash
+  #- source /opt/ros/hydro/setup.bash
+  - source ~/catkin_ws/devel/setup.bash
   - cd ~/skynav_ws/src
 script:
   - cd ~/skynav_ws
