@@ -92,7 +92,7 @@ int main(int argc, char **argv) {
 	
     //subs
     ros::Subscriber subLaser = n.subscribe("laser_scan", 10, subLaserScanCallback);
-    ros::Subscriber subLaser2 = n.subscribe("laser_scan", 10, subLaserScanCallback2);
+    //ros::Subscriber subLaser2 = n.subscribe("laser_scan", 10, subLaserScanCallback2);
 
     
 	mTransformListener = new tf::TransformListener();
