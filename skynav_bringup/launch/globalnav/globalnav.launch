@@ -1,7 +1,5 @@
 <launch>
 
-    <param name="robot_description" command="$(find xacro)/xacro.py '$(find x80sv_description)/urdf/x80sv.xacro'" />
-
 	<group ns="globalnav">
 		<node pkg="skynav_globalnav" name="global_planner" type="global_planner" required="true" output="screen" />
 		<node pkg="skynav_globalnav" name="environment" type="environment" required="true" />

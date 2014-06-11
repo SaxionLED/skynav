@@ -1,18 +1,19 @@
 <launch>
 
+    <arg name="use_gui" default="true" />
+    <arg name="use_localnav" default="true" />
+    <arg name="use_globalnav" default="true" />
+
 	<!-- skynav_control-->	
-		<include file="$(find skynav_bringup)/launch/control.launch"/>
+		<include file="$(find skynav_bringup)/launch/control.launch" />
 
 	<!-- localnav-->
-		<include file="$(find skynav_bringup)/launch/localnav/localnav.launch"/>
+		<include file="$(find skynav_bringup)/launch/localnav/localnav.launch" if="$(arg use_localnav)" />
 
 	<!-- globalnav-->
-		<include file="$(find skynav_bringup)/launch/globalnav/globalnav.launch"/>
+		<include file="$(find skynav_bringup)/launch/globalnav/globalnav.launch" if="$(arg use_globalnav)" />
 	
-	<!-- x80_drivers-->
-		<include file="$(find skynav_bringup)/launch/x80_drivers.launch"/>
-			
 	<!-- skynav_gui-->	
-		<include file="$(find skynav_bringup)/launch/gui.launch"/>
+		<include file="$(find skynav_bringup)/launch/gui.launch" if="$(arg use_gui)" />
 		
 </launch>
