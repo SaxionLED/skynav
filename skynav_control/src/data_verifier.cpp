@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "data_verifier");
 
     ros::NodeHandle n("/control");
-    ros::NodeHandle n_robot("/x80sv");
+    ros::NodeHandle n_robot;
     ros::NodeHandle n_SLAM("/slam");
     
     //pubs
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
     //subs
     // ros::Subscriber subSensors = n_robot.subscribe("sensors", 1024, subSensorsCallback);    
     ros::Subscriber subLaserRobot = n.subscribe("laser/scan_filtered", 1024, subLaserScanCallback);	
-	ros::Subscriber subLaser = n_robot.subscribe("laser/scan", 1024, subFilterLaserCallback);	
+	ros::Subscriber subLaser = n_robot.subscribe("/laser/scan", 1024, subFilterLaserCallback);	
 	//ros::Subscriber	subNavigationState= n.subscribe("navigation_state",0,subNavigationStateCallback);
 
 	//services
