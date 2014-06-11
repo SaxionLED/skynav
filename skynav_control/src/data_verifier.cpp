@@ -12,7 +12,6 @@ using namespace sensor_msgs;
 using namespace geometry_msgs;
 using namespace std;
 
-ros::Publisher pubOdometry;
 ros::Publisher pubSensors;
 ros::Publisher pubLaser;
 ros::Publisher pubLaserFiltered;
@@ -49,12 +48,6 @@ void subSensorsCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
 }
 */
 
-void subRelativePoseCallback(const geometry_msgs::Pose::ConstPtr& msg)        {
-    
-    // check limits here
-    pubOdometry.publish(msg);    
-}
-
 void subLaserScanCallback(const LaserScan::ConstPtr& msg)	{
 	// check limits here
 	
@@ -78,7 +71,7 @@ void subFilterLaserCallback(const LaserScan::ConstPtr& scan) {
 	
 	for(uint i = 0; i < scan->ranges.size(); ++i)	{
 		
-		if(!SIMULATOR){							
+		if (!SIMULATOR){							
 			if(i>30 && i<150){	//cap the laser so the robot wont see itself
 				scan_filtered.ranges.push_back( 0 );			// add empty data into sensordata array, to filter x80 itself out of dataset
 				scan_filtered.intensities.push_back( 0 );
@@ -109,14 +102,12 @@ int main(int argc, char **argv) {
     ros::NodeHandle n_SLAM("/slam");
     
     //pubs
-    pubOdometry = n.advertise<geometry_msgs::Pose>("odometry", 32);
     // pubSensors = n.advertise<skynav_msgs::RangeDefinedArray>("sensors", 1024);
     pubLaser = n.advertise<sensor_msgs::LaserScan>("laser_scan", 1024);    
 	pubLaserFiltered = n.advertise<LaserScan>("laser/scan_filtered", 1024);
 	
     //subs
     // ros::Subscriber subSensors = n_robot.subscribe("sensors", 1024, subSensorsCallback);    
-    ros::Subscriber subRelativePose = n_robot.subscribe("odometry", 32, subRelativePoseCallback);
     ros::Subscriber subLaserRobot = n.subscribe("laser/scan_filtered", 1024, subLaserScanCallback);	
 	ros::Subscriber subLaser = n_robot.subscribe("laser/scan", 1024, subFilterLaserCallback);	
 	//ros::Subscriber	subNavigationState= n.subscribe("navigation_state",0,subNavigationStateCallback);
