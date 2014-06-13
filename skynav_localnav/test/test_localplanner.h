@@ -20,11 +20,8 @@
 
 
 //read a pointcloud from file.pcd and publish return
-void read(const std::string& input)
-{
-//todo
-}
+pcl::PCLPointCloud2 read(const std::string& input);
 
-
+bool pointCloudsEqual(const pcl::PCLPointCloud2 pc_A ,const pcl::PCLPointCloud2 pc_B);
 
 #endif

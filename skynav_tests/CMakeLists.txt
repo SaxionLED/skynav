@@ -7,7 +7,7 @@ catkin_package(
   CATKIN_DEPENDS roscpp tf pcl_ros skynav_msgs rostest
 )
 
-include_directories(include ${catkin_INCLUDE_DIRS} ${GTEST_LIBRARIES})
+include_directories(include ${catkin_INCLUDE_DIRS})
 
 add_executable(static_PC_publisher src/static_PC_publisher.cpp)
 target_link_libraries(static_PC_publisher ${catkin_LIBRARIES})
