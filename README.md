@@ -33,8 +33,6 @@ _http://wiki.ros.org/ROS/Tutorials/InstallingandConfiguringROSEnvironment_
 - Setup .bashrc  
 Source the workspace  
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;___source ~/catkin_ws/devel/setup.bash___  
-Set gazebo model path for offline gazebo models in the model database  
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;___export GAZEBO_MODEL_PATH=~/catkin_ws/src/x80sv/x80sv_simulation/models/___  
 
 - Setup serial ports to right setup and add useraccount to 'dialout' group   
  	_$ useradd -G dialout [USER]_  
@@ -46,8 +44,9 @@ Set gazebo model path for offline gazebo models in the model database
 
 - Create symbolic link of skynav and x80sv folder in /home/[USER]/catkin_ws/src-  
 
-- Run _$ catkin_make_  
+- Run _$ catkin_make_ to build the project  
+- Run _$ catkin_make run_tests_ to build and run the gtests and rostests  
 
-- Connect robot via ttyUSB0 and connect laser,  or run simulator in gazebo  
+- Connect the robot and laser via usb,  or run a robot simulator in gazebo  
 
-- Launch __skynav.launch__  
+- Run _$ roslaunch skynav.launch_ to launch the full skynav navigation package
