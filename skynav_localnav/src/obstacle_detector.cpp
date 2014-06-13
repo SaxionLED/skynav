@@ -36,6 +36,13 @@ boost::mutex mMutex;
 //applies a voxelgrid filter for the pointcloud input and returns a filtered cloud
 pcl::PCLPointCloud2 voxelfilter(const pcl::PCLPointCloud2& inputCloud)
 {
+	//dont filter anything and return when empty input
+	if((inputCloud.width * inputCloud.height)==0)
+	{
+		ROS_WARN("empty inputcloud, no filter applied");
+		return inputCloud;
+	}
+	
 	pcl::PCLPointCloud2ConstPtr InputCloudPtr(new pcl::PCLPointCloud2(inputCloud)); //ugly copy constructor, but seemed neccesary for voxelgrid.setInputCloud() =(
 	pcl::PCLPointCloud2 outputCloud;
 	
@@ -44,7 +51,6 @@ pcl::PCLPointCloud2 voxelfilter(const pcl::PCLPointCloud2& inputCloud)
 	voxel.setLeafSize (0.01f, 0.01f, 0.01f);
 	voxel.filter (outputCloud);
 	
-	//ROS_INFO("Filtered pointCloud from %d to %d",inputCloud.width * inputCloud.height,outputCloud.width * outputCloud.height);
 	return outputCloud;
 }
 
@@ -53,12 +59,17 @@ pcl::PCLPointCloud2 voxelfilter(const pcl::PCLPointCloud2& inputCloud)
 vector<pcl::PCLPointCloud2> extractClusters(const pcl::PCLPointCloud2& inputCloud)
 {
 	vector<pcl::PCLPointCloud2> outputClusters;
+	
+	//dont do anything and return when empty input
+	if((inputCloud.width * inputCloud.height)==0)
+	{
+		ROS_WARN("empty inputcloud, no clusters determined");
+		return outputClusters;
+	}
+	
 	pcl::PCLPointCloud2 clusterCloud;
 	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZI>);
 	pcl::fromPCLPointCloud2(inputCloud, *cloud);
-	
-	//ROS_INFO("nr of points: %d", cloud->points.size());
-
 	
 	//Creating the KdTree object for the search method of the extraction
 	pcl::search::KdTree<pcl::PointXYZI>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZI>);
@@ -89,8 +100,7 @@ vector<pcl::PCLPointCloud2> extractClusters(const pcl::PCLPointCloud2& inputClou
 
 		outputClusters.push_back(clusterCloud);	
 	}
-	//ROS_INFO("nr of clusters: %d", outputClusters.size());
-	
+
 	//if no seperate clusters could be extracted, return a vector containing the full cloud
 	if(outputClusters.empty())
 	{
@@ -151,8 +161,6 @@ pcl::PCLPointCloud2 constructEnvironmentCloud(const vector<pcl::PCLPointCloud2>&
 			cloud = concatinateClouds(cloud, (*it));
 		}
 	}
-	//ROS_INFO("cloud size %d",(cloud.width * cloud.height));
-
 	return cloud;
 }
 
