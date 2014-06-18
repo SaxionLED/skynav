@@ -26,17 +26,10 @@ bool pointCloudsEqual(const pcl::PCLPointCloud2 pc_A ,const pcl::PCLPointCloud2 
 	return((pc_A.width * pc_A.height) == (pc_B.width * pc_B.height));
 }
 
-TEST(LocalPlannerLibTestSuite, testCalcDistance)
+TEST(LocalPlannerLibTestSuite, testDummy)
 {    
-    Point a;
-    a.x = 0;
-    a.y = 0;
-    Point b;
-    b.x = 3;
-    b.y = 4;
-    EXPECT_EQ(5, calcDistance(a, b));
+    //pass
 }
-
 
 TEST(LocalPlannerLibTestSuite, testTruncatValue)
 {
@@ -45,7 +38,7 @@ TEST(LocalPlannerLibTestSuite, testTruncatValue)
 }
 
 
-TEST(LocalNavTestSuite, testConvexHull)
+TEST(LocalPlannerLibTestSuite, testConvexHull)
 {
     pcl::PCLPointCloud2 input = read(ros::package::getPath("skynav_tests")+"/include/testcases/testcase2D.pcd");    
 	pcl::PCLPointCloud2 ref	= read(ros::package::getPath("skynav_tests")+"/include/testcases/testcase2D_solution.pcd");  
@@ -55,10 +48,9 @@ TEST(LocalNavTestSuite, testConvexHull)
 }
 
 
-TEST(LocalNavTestSuite, testConcaveHull)
+TEST(LocalPlannerLibTestSuite, testConcaveHull)
 {
-	//pass 
-     pcl::PCLPointCloud2 input = read(ros::package::getPath("skynav_tests")+"/include/testcases/testcase2D.pcd");    
+    pcl::PCLPointCloud2 input = read(ros::package::getPath("skynav_tests")+"/include/testcases/testcase2D.pcd");    
 	pcl::PCLPointCloud2 ref	= read(ros::package::getPath("skynav_tests")+"/include/testcases/testcase2D_solution.pcd");  
 	
 	EXPECT_FALSE(pointCloudsEqual(pclConcave_hull(input), ref))
@@ -66,13 +58,13 @@ TEST(LocalNavTestSuite, testConcaveHull)
 }
 
 
-TEST(LocalNavTestSuite, testRecursiveBug)
+TEST(LocalPlannerLibTestSuite, testRecursiveBug)
 {
     // pass
 }
 
 
-TEST(LocalNavTestSuite, testWayPointCheck)
+TEST(LocalPlannerLibTestSuite, testWayPointCheck)
 {
     // pass
 }
