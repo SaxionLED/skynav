@@ -16,14 +16,14 @@ using namespace sensor_msgs;
 ros::Publisher pubObjectOutlines, pubNavigationState, pubClusterOutlines;
 ros::Subscriber subNavigationState, subAbsoluteTargetPose, subPointCloudSensorData, subPCVector;
 
-ros::ServiceServer servServerWaypointCheck;
+ros::ServiceServer servServerWaypointCheck, servServerPclWaypointCheck;
 ros::ServiceClient servClientCurrentPose;
 
 vector<PointCloud> mObstacles;					//vector of pointclouds that make up the different objects
 vector<PointCloud> mObjectOutlines;				//vector of outlines for known objects, calculated by the convex / concave hull function
 
-vector<pcl::PCLPointCloud2> mClusters;			//set of clusters(objects)
-vector<pcl::PCLPointCloud2> mClusterOutlines;	//set of cluster outlines
+Pcl2Vector mClusters;			//set of clusters(objects)
+Pcl2Vector mClusterOutlines;	//set of cluster outlines
 
 PoseStamped mCurrentAbsoluteTargetPose;			//the current next target pose, as published by motion_control
 uint8_t mControl_NavigationState;				//the state which motion_control is in.
@@ -69,7 +69,6 @@ void subPCVectorCallback(const skynav_msgs::PointCloudVector::ConstPtr& msg)
 {
 	boost::mutex::scoped_lock lock(mMutex);
 
-	//TODO
 	mClusters.clear();
 	mObstacles.clear();
 	
@@ -87,11 +86,13 @@ void subPCVectorCallback(const skynav_msgs::PointCloudVector::ConstPtr& msg)
 
 void pclPublishHull()
 {
-	if(!mObjectOutlines.empty())
+	boost::mutex::scoped_lock lock(mMutex);
+
+	if(!mClusterOutlines.empty())
 	{
-		for(vector<pcl::PCLPointCloud2>::iterator outlineIt = mClusterOutlines.begin(); outlineIt!= mClusterOutlines.end(); ++outlineIt)
+		for(Pcl2Vector::iterator outlineIt = mClusterOutlines.begin(); outlineIt!= mClusterOutlines.end(); ++outlineIt)
 		{
-			pubObjectOutlines.publish((*outlineIt) );
+			pubClusterOutlines.publish((*outlineIt) );
 		}	
 	}
 }
@@ -99,17 +100,30 @@ void pclPublishHull()
 
 void pclHullFunction()
 {
+	boost::mutex::scoped_lock lock(mMutex);
+
 	mClusterOutlines.clear();
-	
-	for(vector<pcl::PCLPointCloud2>::iterator it = mClusterOutlines.begin(); it!= mClusterOutlines.end(); ++it){
-		if((*it).width * (*it).height > 20){
+
+	for(Pcl2Vector::iterator it = mClusters.begin(); it!= mClusters.end(); ++it)
+	{
+		if((*it).width * (*it).height > 40)
+		{
 			mClusterOutlines.push_back(pclConcave_hull((*it)));
-		}else if((*it).width * (*it).height >10){
+		} 
+		else 
+		if((*it).width * (*it).height <= 40 && (*it).width * (*it).height > 10 )
+		{
 			mClusterOutlines.push_back(pclConvex_hull((*it)));
-		} else if((*it).width * (*it).height >=2){
+		}
+		else 
+		if((*it).width * (*it).height >=2)
+		{
 			mClusterOutlines.push_back((*it));
 		}
 	}
+	//ROS_INFO("cluster_outlines; %d", mClusterOutlines.size());
+	lock.unlock();
+
 	pclPublishHull();	
 }
 
@@ -117,6 +131,8 @@ void pclHullFunction()
 //publish the outer hull pointclouds
 void publishHull()
 {
+	boost::mutex::scoped_lock lock(mMutex);
+
 	if(!mObjectOutlines.empty())
 	{
 		for(vector<PointCloud>::iterator outlineIt = mObjectOutlines.begin(); outlineIt!= mObjectOutlines.end(); ++outlineIt)
@@ -128,18 +144,31 @@ void publishHull()
 
 
 //function to call outline determination for each object
-void hullFunction(){	
+void hullFunction()
+{	
+	boost::mutex::scoped_lock lock(mMutex);
+
 	mObjectOutlines.clear();	//clear the outlines and replace with new data
-	
-	for(vector<PointCloud>::iterator it = mObstacles.begin(); it!= mObstacles.end(); ++it){
-		if((*it).points.size()>10){
+
+	for(vector<PointCloud>::iterator it = mObstacles.begin(); it!= mObstacles.end(); ++it)
+	{
+		if((*it).points.size()>20)
+		{
 			mObjectOutlines.push_back(concave_hull((*it)));
-		}else if ((*it).points.size()>5){
+		}
+		else 
+		if ((*it).points.size()>10)
+		{
 			mObjectOutlines.push_back(convex_hull((*it)));
-		} else if((*it).points.size()>=2){
+		} 
+		else 
+		if((*it).points.size()>=2)
+		{
 			mObjectOutlines.push_back((*it));
 		}
 	}
+	lock.unlock();
+
 	publishHull();
 }
 
@@ -162,7 +191,6 @@ void subAbsoluteTargetPoseCallback(const PoseStamped& msg){
 bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
 
 	hullFunction();	//Only call when asking for colission.
-	pclHullFunction();
 	
 	if(mObjectOutlines.empty()){
 		resp.pathChanged = 0;
@@ -180,35 +208,111 @@ bool servServerWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, 
 	return true;
 }
 
+// receive the two coordinates that make up the current path and check for colission with known objects.
+// objects consist of a set of coordinates that determine the CONVEX outline of the object.
+// the line (edge) between two consecutive coordinates can be checked for colission with the path  
+// if the path is free, set pathChanged on true and return, otherwise call the recursive bug algorithm 
+// and return a new coordinate for the reroute and and return true 	// TODO margin, eg robot size
+bool servServerPclWaypointCheckCallback(skynav_msgs::waypoint_check::Request &req, skynav_msgs::waypoint_check::Response &resp) {
+
+	//Only call when asking for colission.
+	pclHullFunction();
+	
+	if(mClusterOutlines.empty()){
+		resp.pathChanged = 0;
+		return true;	//dont calculate anything and return
+	}
+	pcl::PointXYZ currentPCLPoint;
+	pcl::PointXYZ targetPCLPoint;
+	
+	currentPCLPoint.x	= req.currentPos.x;
+	currentPCLPoint.y 	= req.currentPos.y;
+	targetPCLPoint.x 	= req.targetPos.x;
+	targetPCLPoint.y 	= req.targetPos.y;
+	
+	//if colissioncheck is true, new waypoint is returned, else there is no colission	
+	pclOptionPoint newPoint;
+	if((newPoint = pclWaypointCheck(currentPCLPoint, targetPCLPoint, mClusterOutlines, true))){		//call for colissioncheck with recursiveBug active
+		resp.pathChanged = 1;
+		
+		geometry_msgs::Point nwTargetPoint;
+		nwTargetPoint.x = (*newPoint).x;
+		nwTargetPoint.y = (*newPoint).y;
+		resp.newPos = nwTargetPoint;
+		
+		ROS_INFO("New waypoint at(%f,%f)",resp.newPos.x, resp.newPos.y);
+		return true;
+	}
+	resp.pathChanged = 0;
+	return true;
+}
+
+
 
 //send a new NAVIGATION_STATE as interrupt to motion_control
 void publishInterruptNavigationState(const std_msgs::UInt8 pubmsg){
 	mControl_NavigationState = pubmsg.data;
 	pubNavigationState.publish(pubmsg);
-	
+
 	return;	
+}
+
+
+// call colissioncheck function. if colission occurs, publish interrupt navigationstate for motion_control 
+void pclCollisionCheck(){
+	
+	pclHullFunction();	//Only call when asking for colissioncheck. 
+
+	if(mClusterOutlines.empty()){
+		ROS_INFO("no cluster outline");
+		return;				// dont calculate anything and return
+	}
+
+	Pose currentPose 	= getCurrentPose();
+	Pose targetPose 	= mCurrentAbsoluteTargetPose.pose;
+	
+	pcl::PointXYZ currentPCLPoint;
+	pcl::PointXYZ targetPCLPoint;
+	
+	currentPCLPoint.x	= currentPose.position.x;
+	currentPCLPoint.y 	= currentPose.position.y;
+	targetPCLPoint.x 	= targetPose.position.x;
+	targetPCLPoint.y 	= targetPose.position.y;
+	
+	pclOptionPoint pclCollision;
+	if((pclCollision = pclWaypointCheck(currentPCLPoint, targetPCLPoint, mClusterOutlines, false)))
+	{
+		if(pclCalcDistance(currentPCLPoint, *pclCollision) <= (0.5*MAX_SENSORDIST) )
+		{
+			std_msgs::UInt8 msg;		
+			msg.data = 6;						//TODO replace with NAVIGATION_STATE state;
+			publishInterruptNavigationState(msg);
+			ROS_INFO("Collision at: %f,%f", (*pclCollision).x, (*pclCollision).y );
+		}
+	}	 
+	return;
 }
 
 // call colissioncheck function. if colission occurs, publish interrupt navigationstate for motion_control 
 void collisionCheck(){
-	
-	hullFunction();	//Only call when asking for colissioncheck. 
-	
+	hullFunction();			//Only call when asking for colissioncheck. 
+
 	if(mObjectOutlines.empty()){
 		return;				// dont calculate anything and return
 	}
-	
+
 	Pose currentPose = getCurrentPose();
 	Pose targetPose = mCurrentAbsoluteTargetPose.pose;
 
 	optionPoint collision;
 	if((collision = waypointCheck(currentPose.position, targetPose.position, mObjectOutlines, false))){
-		
+
 		if(calcDistance(currentPose.position, *collision) <= (0.5*MAX_SENSORDIST) ){
+
 			std_msgs::UInt8 msg;		
 			msg.data = 6;		//TODO replace with NAVIGATION_STATE state;
 			publishInterruptNavigationState(msg);
-			//ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
+			ROS_INFO("Collision at: %f,%f", (*collision).x, (*collision).y );
 		}
 	}	 
 	return;
@@ -236,8 +340,9 @@ int main(int argc, char **argv) {
 	//subPointCloudSensorData = n.subscribe("pointCloudData",1,subPointCloudDataCallback);
 
 	//services
-    servServerWaypointCheck = n.advertiseService("path_check", servServerWaypointCheckCallback);
-    
+    //servServerWaypointCheck = n.advertiseService("path_check", servServerWaypointCheckCallback);
+	servServerPclWaypointCheck = n.advertiseService("path_check", servServerPclWaypointCheckCallback);
+
     
 	servClientCurrentPose = n_slam.serviceClient<skynav_msgs::current_pose>("current_pose");
 
@@ -248,7 +353,9 @@ int main(int argc, char **argv) {
 		ros::spinOnce();
 
 		if(mControl_NavigationState == 1){
-			collisionCheck();
+			//collisionCheck();
+			pclCollisionCheck();
+
 			loop_rate.sleep();
 		}	
 	}

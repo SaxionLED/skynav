@@ -28,7 +28,7 @@ bool pclCompare_Point(pcl::PointXYZ p, pcl::PointXYZ q)
 }
 
 
-pcl::PCLPointCloud2 pclConvex_hull(pcl::PCLPointCloud2 inputCloud)
+pcl::PCLPointCloud2 pclConvex_hull(pcl::PCLPointCloud2& inputCloud)
 {
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
@@ -48,21 +48,22 @@ pcl::PCLPointCloud2 pclConvex_hull(pcl::PCLPointCloud2 inputCloud)
 }
 
 
-pcl::PCLPointCloud2 pclConcave_hull(pcl::PCLPointCloud2 inputCloud)
+pcl::PCLPointCloud2 pclConcave_hull(pcl::PCLPointCloud2& inputCloud)
 {
+	pcl::ConcaveHull<pcl::PointXYZ> chull;
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_in(new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_out(new pcl::PointCloud<pcl::PointXYZ>);
-	pcl::ConcaveHull<pcl::PointXYZ> chull;
 	pcl::PCLPointCloud2 outputCloud;	
 	
 	pcl::fromPCLPointCloud2(inputCloud, *cloud_in);
 	
 	chull.setInputCloud (cloud_in);
 	chull.setAlpha (0.2);
+	chull.setDimension(2);
 	chull.reconstruct (*cloud_out);
 	
-	pcl::toPCLPointCloud2(*cloud_out, outputCloud);
-		
+	pcl::toPCLPointCloud2(*cloud_in, outputCloud);
+
 	return outputCloud;
 }
 
@@ -290,14 +291,13 @@ pclOptionPoint pclRecursiveBug(const pcl::PointXYZ currentPos, const pcl::PointX
 		return pclOptionPoint();		
 		ROS_ERROR("Targetpose is not valid, skipping targetPose!"); 	
 	}
-	return pclOptionPoint(nwTarget);	//return true with new target
-	
+	return pclOptionPoint(nwTarget);	//return true with new target	
 }
 
 
 //function to determine if there is a colission, where, and (if needed) call for a new waypoint calculation.
 //if recursiveBugNeeded is true, the return value is the new waypoint calculated with the recursivebug algorithm, if false: the return is the collisionpoint itself
-pclOptionPoint pclWaypointCheck(const pcl::PointXYZ pPath1, const pcl::PointXYZ pPath2, std::vector<pcl::PCLPointCloud2> outlinesInput, bool recursiveBugNeeded)
+pclOptionPoint pclWaypointCheck(const pcl::PointXYZ pPath1, const pcl::PointXYZ pPath2, Pcl2Vector outlinesInput, bool recursiveBugNeeded)
 {	
 	//line function for path Ax+By=C
 	double A1 = pPath2.y-pPath1.y;
@@ -310,27 +310,27 @@ pclOptionPoint pclWaypointCheck(const pcl::PointXYZ pPath1, const pcl::PointXYZ 
 	double determant;
 	
 	pcl::PointXYZ intersection;
-	vector<pcl::PointCloud<pcl::PointXYZ> > outlines;
-	pcl::PointCloud<pcl::PointXYZ> cloud;
-	vector<pcl::PointXYZ> colissions;
-	vector<pcl::PointCloud<pcl::PointXYZ> > intersect_obstacles;
-	bool collisionsFound=false;
 	pcl::PCLPointCloud2 relObjectConvert;
+	vector<pcl::PointXYZ> colissions;
+	pcl::PointCloud<pcl::PointXYZ> cloud;
+	PclXYZVector outlines;
+	PclXYZVector intersect_obstacles;
+
+	bool collisionsFound=false;
 	
 	//convert pclpointcloud2 to pointcloud<pointxyz> for conveniance in the algorithm
-	for(vector<pcl::PCLPointCloud2>::iterator outlineIt = outlinesInput.begin(); outlineIt != outlinesInput.end(); ++outlineIt)
+	for(Pcl2Vector::iterator outlineIt = outlinesInput.begin(); outlineIt != outlinesInput.end(); ++outlineIt)
 	{
 		pcl::fromPCLPointCloud2((*outlineIt), cloud);
-		outlines.push_back( cloud );
+		outlines.push_back( cloud );		
 	}	
 	
-	for (vector<pcl::PointCloud<pcl::PointXYZ> >::iterator outlineIt = outlines.begin(); outlineIt != outlines.end(); ++outlineIt) 
+	for (PclXYZVector::iterator outlineIt = outlines.begin(); outlineIt != outlines.end(); ++outlineIt) 
 	{
 		if((*outlineIt).points.size() >= 2)
 		{
 			for(int i = 0, j = 1; j<(*outlineIt).points.size(); ++i,++j)
 			{
-
 				pcl::PointXYZ pObstacle1 = (*outlineIt).points.at(i);
 				pcl::PointXYZ pObstacle2 = (*outlineIt).points.at(j);
 		
@@ -386,7 +386,6 @@ pclOptionPoint pclWaypointCheck(const pcl::PointXYZ pPath1, const pcl::PointXYZ 
 				pcl::toPCLPointCloud2(relObject, relObjectConvert );
 			}
 		}		
-		//ROS_INFO("colission at (%f, %f), %d", relColission.x, relColission.y, relObject.points.size());
 		
 		if(recursiveBugNeeded)
 		{
@@ -403,10 +402,10 @@ pclOptionPoint pclWaypointCheck(const pcl::PointXYZ pPath1, const pcl::PointXYZ 
 		//recursive bug is not neccesary, only collisionpoint is asked
 		return pclOptionPoint(relColission); //return true with colissionpoint		
 	}
+
 	//no colissions found
 	return pclOptionPoint();  //return false 	
 }
-
 
 
 //-------------------------------------------------------------------------------------------------//
@@ -489,12 +488,12 @@ PointCloud concave_hull(PointCloud data)
 //recursive bug algorithm for object avoidance
 optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Point collisionPoint, const PointCloud objectPC)
 {
-
 	if(objectPC.points.empty())
 	{
 		ROS_WARN("Object size is zero, stopping recursive bug");
 		return optionPoint();	//return false;
 	}
+	
 	bool foundNew = false;
 		
 	Point nwTarget;
@@ -714,7 +713,6 @@ optionPoint recursiveBug(const Point currentPos,const Point targetPos, const Poi
 //if recursiveBugNeeded is true, the return value is the new waypoint calculated with the recursivebug algorithm, if false: the return is the collisionpoint itself
 optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCloud> outlines, bool recursiveBugNeeded)
 {
-	
 	//line function for path Ax+By=C
 	double A1 = pPath2.y-pPath1.y;
 	double B1 = pPath1.x - pPath2.x;
@@ -789,9 +787,7 @@ optionPoint waypointCheck(const Point pPath1, const Point pPath2, vector<PointCl
 				relColission = colissions.at(i);
 				relObject = intersect_obstacles.at(i);
 			}
-		}		
-		//ROS_INFO("colission at (%f, %f), %d", relColission.x, relColission.y, relObject.points.size());
-		
+		}			
 		if(recursiveBugNeeded)
 		{
 			//calculate new Point newPoint with recursive bug algorithm

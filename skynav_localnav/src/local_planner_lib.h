@@ -2,6 +2,14 @@
 #ifndef LOCAL_PLANNER_LIB_H
 #define LOCAL_PLANNER_LIB_H
 
+//TODO FIX
+//this causes segfaults in pcl::ConcaveHull!!
+// be carefull of this define; 
+// see http://eigen.tuxfamily.org/dox-devel/group__TopicUnalignedArrayAssert.html
+// and http://eigen.tuxfamily.org/dox-devel/group__TopicStlContainers.html
+//#define EIGEN_DONT_ALIGN_STATICALLY 
+//#define EIGEN_DISABLE_UNALIGNED_ARRAY_ASSERT
+
 #include <math.h>
 
 #include <geometry_msgs/Point.h>
@@ -21,42 +29,42 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/extract_clusters.h>
 
-#include <boost/optional.hpp>
 #include <boost/thread/mutex.hpp>
-
+#include "localnav_types.h"
 
 #define ROBOTRADIUS 		1 		//the radius of the robot. TODO get this from somewhere robot dependent
 #define MAX_SENSORDIST 		4		//the outer range of the sensors TODO get this from laser sensor dependent
 
-typedef boost::optional<geometry_msgs::Point> optionPoint;
-typedef boost::optional<pcl::PointXYZ> pclOptionPoint;		
-
-//calculate distance between two point with use of pythagoras
-double calcDistance(geometry_msgs::Point a, geometry_msgs::Point b);
 
 //truncate values (in meters) to certain precision
 float truncateValue(const float value);
 
-//compare both points to each other
-bool compare_Point(geometry_msgs::Point p, geometry_msgs::Point q);
+double pclCalcDistance(pcl::PointXYZ a, pcl::PointXYZ b);
+
+bool pclCompare_Point(pcl::PointXYZ p, pcl::PointXYZ q);
 
 //determine pcl convex hull
-pcl::PCLPointCloud2 pclConvex_hull(pcl::PCLPointCloud2 inputCloud);
+pcl::PCLPointCloud2 pclConvex_hull(pcl::PCLPointCloud2& inputCloud);
 
 //determine pcl concave hull
-pcl::PCLPointCloud2 pclConcave_hull(pcl::PCLPointCloud2 inputCloud);
+pcl::PCLPointCloud2 pclConcave_hull(pcl::PCLPointCloud2& inputCloud);
 
 //recursive bug algorithm for object avoidance 
-pclOptionPoint recursiveBug(const pcl::PointXYZ currentPos, const pcl::PointXYZ targetPos, const pcl::PointXYZ collisionPoint, const pcl::PCLPointCloud2 objectPC_input);
+pclOptionPoint pclRecursiveBug(const pcl::PointXYZ currentPos, const pcl::PointXYZ targetPos, const pcl::PointXYZ collisionPoint, const pcl::PCLPointCloud2 objectPC_input);
 
 //function to determine if there is a colission, where, and (if needed) call for a new waypoint calculation.
 //if recursiveBugNeeded is true, the return value is the new waypoint calculated with the recursivebug algorithm, if false: the return is the collisionpoint itself
-pclOptionPoint waypointCheck(const pcl::PointXYZ pPath1, const pcl::PointXYZ pPath2, std::vector<pcl::PCLPointCloud2> outlinesInput, bool recursiveBugNeeded);
+pclOptionPoint pclWaypointCheck(const pcl::PointXYZ pPath1, const pcl::PointXYZ pPath2, Pcl2Vector outlinesInput, bool recursiveBugNeeded);
 
 
 //-------------------------------------------------------------------------------------------------//
 //old style pointcloud, to be deprecated
 
+//compare both points to each other
+bool compare_Point(geometry_msgs::Point p, geometry_msgs::Point q);
+
+//calculate distance between two point with use of pythagoras
+double calcDistance(geometry_msgs::Point a, geometry_msgs::Point b);
 
 //determine the convex outer shape of the 2d pointcloud
 sensor_msgs::PointCloud convex_hull(sensor_msgs::PointCloud data);

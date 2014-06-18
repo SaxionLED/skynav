@@ -2,7 +2,6 @@
 #include <ros/package.h>
 
 #include <sensor_msgs/PointCloud2.h>
-#include <geometry_msgs/Pose.h>
 #include <skynav_msgs/PointCloudVector.h>
 
 #include <pcl_ros/point_cloud.h>
@@ -12,6 +11,9 @@
 #include <pcl/kdtree/kdtree.h>
 #include <pcl/filters/extract_indices.h>
 #include <pcl/segmentation/extract_clusters.h>
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/ModelCoefficients.h>
+#include <pcl/filters/project_inliers.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/PCLPointCloud2.h>
@@ -19,16 +21,16 @@
 #include <boost/thread/mutex.hpp>
 #include <tf/transform_listener.h>
 
-using namespace std;
-using namespace geometry_msgs;
-using namespace sensor_msgs;
+#include "localnav_types.h"
 
-ros::Publisher pubSensorData, pubCloud, pubCloudRaw, pubPCVector;
+using namespace std;
+
+ros::Publisher pubSensorData, pubCloud, pubCloudRaw, pubPCVector, pubClusters;
 ros::ServiceClient servClientCurrentPose;
 
 tf::TransformListener* mTransformListener;
 
-vector<pcl::PCLPointCloud2> mCloudSet;		//the set of pointclouds received in one loop
+Pcl2Vector mCloudSet;		//the set of pointclouds received in one loop
 
 boost::mutex mMutex;
 
@@ -54,11 +56,12 @@ pcl::PCLPointCloud2 voxelfilter(const pcl::PCLPointCloud2& inputCloud)
 	return outputCloud;
 }
 
-
+//TODO allign the vector because of eigen component!!!
+//http://eigen.tuxfamily.org/dox-devel/group__TopicStlContainers.html
 //determine and extract clusters from the input cloud and return them
-vector<pcl::PCLPointCloud2> extractClusters(const pcl::PCLPointCloud2& inputCloud)
+Pcl2Vector extractClusters(const pcl::PCLPointCloud2& inputCloud)
 {
-	vector<pcl::PCLPointCloud2> outputClusters;
+	Pcl2Vector outputClusters;
 	
 	//dont do anything and return when empty input
 	if((inputCloud.width * inputCloud.height)==0)
@@ -68,17 +71,17 @@ vector<pcl::PCLPointCloud2> extractClusters(const pcl::PCLPointCloud2& inputClou
 	}
 	
 	pcl::PCLPointCloud2 clusterCloud;
-	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZI>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::fromPCLPointCloud2(inputCloud, *cloud);
 	
 	//Creating the KdTree object for the search method of the extraction
-	pcl::search::KdTree<pcl::PointXYZI>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZI>);
+	pcl::search::KdTree<pcl::PointXYZ>::Ptr tree (new pcl::search::KdTree<pcl::PointXYZ>);
 	tree->setInputCloud (cloud);
 
 	std::vector<pcl::PointIndices> cluster_indices;
   
-	pcl::EuclideanClusterExtraction<pcl::PointXYZI> ec;
-	ec.setClusterTolerance (0.15); 		// in meters
+	pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
+	ec.setClusterTolerance (0.20); 		// in meters
 	ec.setMinClusterSize (3); 			//default = 1
 	//ec.setMaxClusterSize (250000); 	//default = MAXINT
 	ec.setSearchMethod (tree);
@@ -87,7 +90,8 @@ vector<pcl::PCLPointCloud2> extractClusters(const pcl::PCLPointCloud2& inputClou
 
 	for (std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin (); it != cluster_indices.end (); ++it)
 	{
-		pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZI>);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster (new pcl::PointCloud<pcl::PointXYZ>);
+		
 		for (std::vector<int>::const_iterator pit = it->indices.begin (); pit != it->indices.end (); pit++)
 			cloud_cluster->points.push_back (cloud->points[*pit]);
 			cloud_cluster->width = cloud_cluster->points.size ();
@@ -105,8 +109,7 @@ vector<pcl::PCLPointCloud2> extractClusters(const pcl::PCLPointCloud2& inputClou
 	if(outputClusters.empty())
 	{
 		outputClusters.push_back(inputCloud);
-	}
-	
+	}	
 	return outputClusters;
 }
 
@@ -117,8 +120,8 @@ pcl::PCLPointCloud2 concatinateClouds(const pcl::PCLPointCloud2& inputCloudA, co
 	pcl::PCLPointCloud2 returnCloud;	
 	
 	//TODO pcl::PCLPointCloud2 does not seem to have operator '+=' even though it is documented by pcl.. needs further investigation
-	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud1 (new pcl::PointCloud<pcl::PointXYZI>);
-	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud2 (new pcl::PointCloud<pcl::PointXYZI>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud1 (new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud2 (new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::fromPCLPointCloud2(inputCloudA, *cloud1);
 	pcl::fromPCLPointCloud2(inputCloudB, *cloud2);
 	
@@ -137,21 +140,47 @@ pcl::PCLPointCloud2 concatinateClouds(const pcl::PCLPointCloud2& inputCloudA, co
 }
 
 
-//project the pointcloud (2D or 3D) onto the XYplane (Z=0)
+//TODO CHECK // project the pointcloud (2D or 3D) onto the XYplane (Z=0)
 pcl::PCLPointCloud2 projectOnXYPlane(const pcl::PCLPointCloud2& inputCloud)
 {
+	if((inputCloud.width * inputCloud.height)==0)
+	{
+		//ROS_WARN("empty inputcloud, no projection performed determined");
+		return inputCloud;
+	}
 	pcl::PCLPointCloud2 outputCloud;
-	//TODO
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+	pcl::PointCloud<pcl::PointXYZ> cloud_projected;	
+	
+	pcl::fromPCLPointCloud2(inputCloud, *cloud);
+	
+	// Create a set of planar coefficients with X=Y=0,Z=1
+	pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients ());
+	coefficients->values.resize (4);
+	coefficients->values[0] = 0;
+	coefficients->values[1] = 0;
+	coefficients->values[2] = 1.0;
+	coefficients->values[3] = 0;
+	
+	// Create the filtering object
+	pcl::ProjectInliers<pcl::PointXYZ> proj;
+	proj.setModelType (pcl::SACMODEL_PLANE);
+	proj.setInputCloud (cloud);
+	proj.setModelCoefficients (coefficients);
+	proj.filter (cloud_projected);
+	
+	pcl::toPCLPointCloud2(cloud_projected, outputCloud);
+	
 	return outputCloud;
 }
 
 
 //concatinate the available clouds gathered in one loop into one pointcloud
-pcl::PCLPointCloud2 constructEnvironmentCloud(const vector<pcl::PCLPointCloud2>& cloudSet)
+pcl::PCLPointCloud2 constructEnvironmentCloud(const Pcl2Vector& cloudSet)
 {
 	pcl::PCLPointCloud2 cloud;
 
-	for(vector<pcl::PCLPointCloud2>::const_iterator it = cloudSet.begin(); it!= cloudSet.end(); ++it)
+	for(Pcl2Vector::const_iterator it = cloudSet.begin(); it!= cloudSet.end(); ++it)
 	{
 		if (cloud.width * cloud.height == 0)
 		{
@@ -168,7 +197,14 @@ pcl::PCLPointCloud2 constructEnvironmentCloud(const vector<pcl::PCLPointCloud2>&
 //output a pointcloud to a PCD file
 void writeOutputPCD(const pcl::PCLPointCloud2& inputCloud)
 {	
-	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZI>);
+	//dont do anything and return when empty input
+	if((inputCloud.width * inputCloud.height)==0)
+	{
+		//ROS_WARN("empty inputcloud, nothing to be done");
+		return;
+	}
+	
+	pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
 	pcl::fromPCLPointCloud2(inputCloud, *cloud);
 	try{
 		pcl::io::savePCDFileASCII (ros::package::getPath("skynav_localnav")+"/export/EXPORT.pcd", *cloud);
@@ -190,10 +226,16 @@ void publishObjects()
 {		
 	boost::mutex::scoped_lock lock(mMutex);
 	
+	//if the cloudset is empty, dont publish anything
+	if(mCloudSet.empty()){
+		return;
+	}
+	
+	
 	//declare pointclouds
 	pcl::PCLPointCloud2 cloud;	
 	pcl::PCLPointCloud2 cloud_filtered;
-	vector<pcl::PCLPointCloud2> cloud_clusters;
+	Pcl2Vector cloud_clusters;
 	skynav_msgs::PointCloudVector msg;
 
 	//create pointclouds
@@ -209,23 +251,27 @@ void publishObjects()
 	//publish clusters	
 	cloud_clusters = extractClusters(cloud_filtered);
 	
-	//publish vector of pointcloud2. TODO these converstions are dirty and unwanted!
-	for(vector<pcl::PCLPointCloud2>::iterator it = cloud_clusters.begin();it!=cloud_clusters.end();++it)
+	//publish message with vector of pointcloud2 for local planner. 
+	//TODO these converstions are dirty and unwanted!
+	for(Pcl2Vector::iterator it = cloud_clusters.begin();it!=cloud_clusters.end();++it)
 	{
-		pcl::PointCloud<pcl::PointXYZI>::Ptr pclPC (new pcl::PointCloud<pcl::PointXYZI>);
+		pcl::PointCloud<pcl::PointXYZ>::Ptr pclPC (new pcl::PointCloud<pcl::PointXYZ>);
 		sensor_msgs::PointCloud2 cluster;
 		pcl::fromPCLPointCloud2((*it), *pclPC);
 		pcl::toROSMsg(*pclPC, cluster);
 		
 		msg.clouds.push_back(cluster);
+		pubClusters.publish(cluster);
 	}
 	pubPCVector.publish(msg);
 		
 	//clean up data
 	forgetObjects();	
 
+//----FOR TESTING PURPOSES-----
 	//write cloud to pcd file		
-	//writeOutputPCD(cloud);		
+	//writeOutputPCD(cloud);
+//-----------------------------	
 }
 
 
@@ -261,8 +307,9 @@ int main(int argc, char **argv)
     //pubs
     pubPCVector = n.advertise<skynav_msgs::PointCloudVector>("pointcloudVector",1);
     
-    pubCloud = n.advertise<pcl::PCLPointCloud2>("pointCloudData",10);
-    pubCloudRaw = n.advertise<pcl::PCLPointCloud2>("pointCloudDataRaw",10);
+    pubCloud 	= 	n.advertise<pcl::PCLPointCloud2>("pointCloudData",10);
+    pubCloudRaw = 	n.advertise<pcl::PCLPointCloud2>("pointCloudDataRaw",10);
+    pubClusters = 	n.advertise<pcl::PCLPointCloud2>("pointCloudDataClusters",10);
 
     //subs
 	ros::Subscriber subSensorCloud = n_control.subscribe("cloud", 10, subPointCloudDataCallback);
