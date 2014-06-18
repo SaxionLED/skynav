@@ -18,7 +18,8 @@ tf::TransformListener* mTransformListener;
 laser_geometry::LaserProjection mLaserProjector;
 
 
-//receive a sensor_msgs::laserscan from the robot laser, and translate to the right frame and project to a sensor_msgs::PointCloud2.
+//receive a sensor_msgs::laserscan from the robot laser
+//translate it to the right frame and project to a sensor_msgs::PointCloud2.
 void subLaserScanCallback(const LaserScan::ConstPtr& scan_in) 
 {
 	//transform to the right frame
@@ -78,8 +79,8 @@ void subLaserScanCallback2(const sensor_msgs::LaserScan::ConstPtr& scan_in)
 }
 
 
-
-int main(int argc, char **argv) {
+int main(int argc, char **argv) 
+{
 
     ros::init(argc, argv, "laser_receiver");
 

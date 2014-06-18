@@ -59,8 +59,6 @@ void publish(pcl::PCLPointCloud2& cloud)
 	cloud.header.frame_id = "/map";
 	
 	pubCloud.publish(cloud);
-	
-	//ROS_INFO("Original pointCloud dimensions: %d" , cloud.width * cloud.height );
 }
 
 

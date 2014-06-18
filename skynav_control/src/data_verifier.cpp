@@ -11,13 +11,13 @@ using namespace std;
 
 ros::Publisher pubSensors;
 ros::Publisher pubLaser;
-ros::Publisher pubLaserFiltered;
 
 ros::ServiceClient servClientCurrentPose;
 
-uint8_t mControl_NavigationState = 0;				//the state which motion_control is in.
+uint8_t mControl_NavigationState = 0;
 
-Pose getCurrentPose() {
+Pose getCurrentPose() 
+{
 
     Pose currentPose;
 
@@ -33,11 +33,11 @@ Pose getCurrentPose() {
 
 void subNavigationStateCallback(const std_msgs::UInt8& msg ){
 	mControl_NavigationState = msg.data;
-	//ROS_INFO("localnav NavigationState: %d", msg.data);	
 }
 
 /*
-void subSensorsCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
+void subSensorsCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) 
+{
     
     // check limits here
     
@@ -45,8 +45,9 @@ void subSensorsCallback(const skynav_msgs::RangeDefinedArray::ConstPtr& msg) {
 }
 */
 
-//filter the (raw)LaserScan data coming from the neato
-void subFilterLaserCallback(const LaserScan::ConstPtr& scan) {
+//filter the (raw)LaserScan data
+void subFilterLaserCallback(const LaserScan::ConstPtr& scan) 
+{
 	LaserScan scan_filtered;
 	scan_filtered.header.frame_id = scan->header.frame_id;
 	scan_filtered.header.stamp = scan->header.stamp;
@@ -81,7 +82,8 @@ void subFilterLaserCallback(const LaserScan::ConstPtr& scan) {
 
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv) 
+{
 
     ros::init(argc, argv, "data_verifier");
 
