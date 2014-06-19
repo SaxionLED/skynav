@@ -4,53 +4,22 @@
 #include <pcl/io/pcd_io.h>
 #include <pcl/point_cloud.h>
 #include <pcl/point_types.h>
-#include <tf/transform_listener.h>
-#include <sensor_msgs/PointCloud2.h> 
 #include <ros/package.h>
 
 ros::Publisher pub,pubCloud;
-tf::TransformListener* mTransformListener;
 
-
-pcl::PointCloud<pcl::PointXYZI> read()
+pcl::PCLPointCloud2 read()
 {	
 	pcl::PCDReader reader;	
-	pcl::PointCloud<pcl::PointXYZI> cloud;
+	pcl::PointCloud<pcl::PointXYZ> data;
+	pcl::PCLPointCloud2 cloud;
 
-	reader.read(ros::package::getPath("skynav_tests")+"/include/EXPORT8.pcd", cloud);
+	reader.read(ros::package::getPath("skynav_tests")+"/include/EXPORT8.pcd", data);
+	
+	pcl::toPCLPointCloud2(data, cloud);
 
-	cloud.header.frame_id = "/laser_link";
+	cloud.header.frame_id = "/map";
 	return cloud;
-}
-
-
-pcl::PCLPointCloud2 transform(const pcl::PointCloud<pcl::PointXYZI>& input)
-{	
-	tf::StampedTransform transform;	
-	pcl::PointCloud<pcl::PointXYZI> cloudTransformed;
-	pcl::PCLPointCloud2 output;
-
-	try
-	{
-		mTransformListener->lookupTransform("/map", "/laser_link", ros::Time(0), transform);
-		pcl_ros::transformPointCloud(input, cloudTransformed, transform);
-	}
-	catch (tf::TransformException& e)
-	{
-		ROS_ERROR("%s", e.what());
-			
-		cloudTransformed = input;
-	}	
-	
-	try{
-		pcl::toPCLPointCloud2(cloudTransformed, output);
-	}
-	catch(std::exception& e)
-	{
-		ROS_ERROR("%s",e.what());
-	}
-	
-	return output;
 }
 
 
@@ -64,29 +33,23 @@ void publish(pcl::PCLPointCloud2& cloud)
 
 void loop()
 {
-	pcl::PointCloud<pcl::PointXYZI> pclpointcloud;
-	pcl::PCLPointCloud2 pclpointcloud2;
+	pcl::PCLPointCloud2 cloud;
 
-	pclpointcloud = read();
-	pclpointcloud2 = transform(pclpointcloud);
+	cloud = read();
 	
-	publish(pclpointcloud2);
+	publish(cloud);
 }
 
 
 int main (int argc, char** argv)
 {
-	ROS_INFO("started publisher");	
+	ROS_INFO("started static publisher");	
 
 	ros::init (argc, argv, "pcl_publisher");
 	
 	ros::NodeHandle nh_control = ros::NodeHandle("/control");
 	
-    mTransformListener = new tf::TransformListener();
-
 	pubCloud = nh_control.advertise<pcl::PCLPointCloud2> ("cloud", 1);
-
-	ros::Duration(1).sleep();
 
 	ros::Rate loop_rate(2);	
 	while(ros::ok)
