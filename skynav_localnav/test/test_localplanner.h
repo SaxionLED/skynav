@@ -17,11 +17,17 @@
 #include <sensor_msgs/point_cloud_conversion.h>
 
 #include <ros/package.h>
+#include "localnav_types.h"
+
 
 
 //read a pointcloud from file.pcd and publish return
 pcl::PCLPointCloud2 read(const std::string& input);
 
 bool pointCloudsEqual(const pcl::PCLPointCloud2 pc_A ,const pcl::PCLPointCloud2 pc_B);
+
+bool wpcheck_validate(const pclOptionPoint& value, const pcl::PCLPointCloud2& ref);
+
+bool rec_bug_validate(const pclOptionPoint& value, const pcl::PCLPointCloud2& ref);
 
 #endif
