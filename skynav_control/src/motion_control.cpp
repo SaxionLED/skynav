@@ -22,7 +22,7 @@
 #define DISTANCE_ERROR_ALLOWED          0.1                    // in meters
 
 #define ROBOT_WAYPOINT_ACCURACY         true                   // if true, robot will continue trying to reach target goal within error values until proceeding to next target
-#define CONSECUTIVE_PATHS				false					//if true, each received path will be added to the current path. if false, current path is erased, and new path is the new way to go
+#define CONSECUTIVE_PATHS				true					//if true, each received path will be added to the current path. if false, current path is erased, and new path is the new way to go
 
 enum NAVIGATION_STATE { 			//TODO move this into a shared container (skynav_msgs perhaps?)
     NAV_READY = 0,					//check for new path recieved
