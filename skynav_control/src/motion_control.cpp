@@ -100,12 +100,15 @@ void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 	
 	ROS_INFO("path received by motion control");
 
-	if(CONSECUTIVE_PATHS && path_init){
+	if(CONSECUTIVE_PATHS && path_init)
+	{
 		mCurrentPath->insert(mCurrentPath->end(), msg->poses.begin(), msg->poses.end());
 		mOriginalPath->insert(mOriginalPath->end(), msg->poses.begin(), msg->poses.end());
 		mEndOrientation = mOriginalPath->back().pose.orientation.z;
 		return;
-	} else {	
+	} 
+	else if(path_init) 
+	{	
 		pubNavigationStateHelper(NAV_STOP);	
 	}
 	
@@ -277,6 +280,8 @@ void navigate() {
 			if(mCurrentPath->empty()){
 				ROS_INFO("Waypoint list empty, target reached");                
                 //motionTurn(mEndOrientation); //function is blocking when mEndOrientation is not reached
+                pubNavigationStateHelper(NAV_STOP);
+                break;
 			}
                        
 			pubNavigationStateHelper(NAV_READY);
@@ -360,7 +365,7 @@ void navigate() {
 								}
 								publishCmdVel(twist);
 								
-								
+								//TODO //WARNING: FUNCTION IS BLOCKING!
 								while(currentPose.orientation.z > theta + ANGLE_ERROR_ALLOWED || currentPose.orientation.z < theta - ANGLE_ERROR_ALLOWED)	{
 									//do nothing, continue turning
 									currentPose = getCurrentPose();
