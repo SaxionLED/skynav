@@ -4,7 +4,6 @@
 #include <skynav_msgs/current_pose.h>
 #include <skynav_msgs/PointCloudVector.h>
 
-
 #include <std_msgs/UInt8.h>
 
 #include "local_planner_lib.h"
@@ -15,7 +14,7 @@ using namespace geometry_msgs;
 ros::Publisher pubObjectOutlines, pubNavigationState, pubClusterOutlines;
 ros::Subscriber subNavigationState, subAbsoluteTargetPose, subPointCloudSensorData, subPCVector;
 
-ros::ServiceServer servServerWaypointCheck, servServerPclWaypointCheck;
+ros::ServiceServer servServerPclWaypointCheck;
 ros::ServiceClient servClientCurrentPose;
 
 Pcl2Vector mClusters;			//set of clusters(objects)
@@ -170,7 +169,6 @@ bool servServerPclWaypointCheckCallback(skynav_msgs::waypoint_check::Request &re
 }
 
 
-
 //send a new NAVIGATION_STATE as interrupt to motion_control
 void publishInterruptNavigationState(const std_msgs::UInt8 pubmsg){
 	mControl_NavigationState = pubmsg.data;
@@ -225,7 +223,6 @@ int main(int argc, char **argv) {
 
     //pubs
 	pubClusterOutlines = n.advertise<pcl::PCLPointCloud2>("clusterOutlines", 10);
-
     pubNavigationState = n_control.advertise<std_msgs::UInt8>("navigation_state_interrupt", 0);    
     
     //subs

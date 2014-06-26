@@ -21,7 +21,6 @@ pcl::PCLPointCloud2 mOriginal;
 vector<pcl::PCLPointCloud2> mClusters;
 
 
-
 void subSensorPointCloudDataCallback(const pcl::PCLPointCloud2ConstPtr& msg)
 {
 	mOriginal = (*msg);
@@ -53,6 +52,30 @@ TEST(LocalnavTests, countClusters)
 	EXPECT_EQ(27, countClusters(mClusters));
 }
 
+
+TEST(LocalnavTests, DISABLED_waypointCheck)
+{
+	//pass
+}
+
+
+TEST(LocalnavTests, DISABLED_recursiveBugCheck)
+{
+	//pass
+}
+
+
+TEST(LocalnavTests, DISABLED_path_waypointCheck)
+{
+	//pass
+	
+}
+
+TEST(LocalnavTests, DISABLED_path_waypointCheckRecursiveBug)
+{
+	//pass
+	
+}
 
 int main(int argc, char **argv)
 {

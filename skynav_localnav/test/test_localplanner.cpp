@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 #include <local_planner_lib.h>
 #include "test_localplanner.h"
@@ -51,13 +50,6 @@ TEST(LocalPlannerLibTestSuite, testDummy)
 {    
     //pass
     //EXPECT_TRUE();
-}
-
-
-TEST(LocalPlannerLibTestSuite, testTruncatValue)
-{
-    float input = 1.234567890987;
-    EXPECT_FLOAT_EQ(1.234, truncateValue(input));
 }
 
 
@@ -129,6 +121,34 @@ TEST(LocalPlannerLibTestSuite, testRecursiveBug)
     
     EXPECT_TRUE(rec_bug_validate( pclRecursiveBug(start,target,(*collisionPoint), input_outline), input)) ;
      
+}
+
+TEST(LocalPlannerLibTestSuite, testWayPointCheckRecursiveBug)
+{
+	pcl::PCLPointCloud2 input = read(ros::package::getPath("skynav_tests")+"/include/EXPORT10.pcd");    
+    ASSERT_TRUE((input.width * input.height) != 0);
+    
+    pcl::PCLPointCloud2 input_outline = pclConcave_hull(input);
+    ASSERT_TRUE((input_outline.width * input_outline.height) != 0);
+    
+    Pcl2Vector vOutlines;
+    vOutlines.push_back(input_outline);
+    ASSERT_TRUE(!vOutlines.empty());
+    
+    pcl::PointXYZ start1(0,0,0); 		
+    pcl::PointXYZ target1(4,0,0);
+        
+    pcl::PointXYZ start2(0,0,0); 		
+    pcl::PointXYZ target2(3,2,0);
+    
+	pcl::PointXYZ start3(0,0,0); 		
+    pcl::PointXYZ target3(3,-2,0);
+    
+    EXPECT_TRUE (rec_bug_validate( pclWaypointCheck( start1 , target1, vOutlines, true ) , input) ); 
+	EXPECT_TRUE (rec_bug_validate( pclWaypointCheck( target1, start1,  vOutlines, true ) , input) ); 
+    EXPECT_FALSE(rec_bug_validate( pclWaypointCheck( start2 , target2, vOutlines, true ) , input) ); 
+	EXPECT_FALSE(rec_bug_validate( pclWaypointCheck( start3 , target3, vOutlines, true ) , input) ); 	
+	
 }
 
 

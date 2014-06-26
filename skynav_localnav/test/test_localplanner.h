@@ -19,9 +19,6 @@
 #include <ros/package.h>
 #include "localnav_types.h"
 
-
-
-//read a pointcloud from file.pcd and publish return
 pcl::PCLPointCloud2 read(const std::string& input);
 
 bool pointCloudsEqual(const pcl::PCLPointCloud2 pc_A ,const pcl::PCLPointCloud2 pc_B);
