@@ -1,0 +1,6 @@
+<launch>
+
+	<test test-name="_full_systemtest_skynav"  pkg="skynav_tests" type="full_skynav_system_tests"  name="full_skynav_system_tests" time-limit="1200"  >
+    </test>
+ 
+</launch>
