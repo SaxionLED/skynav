@@ -21,7 +21,6 @@ pcl::PCLPointCloud2 mReceived;
 pcl::PCLPointCloud2 mReceivedRaw;
 
 
-
 void subODPointCloudDataCallback(const pcl::PCLPointCloud2ConstPtr& msg)
 {
 	mReceived = (*msg);
@@ -54,6 +53,8 @@ void subPCVectorCallback(const skynav_msgs::PointCloudVector::ConstPtr& msg)
 
 
 //compare two pointclouds based on size
+//modulo is used in case the cloud is read and concatinated multiple times due to buffering in ros
+//if the cloud stays exact the same (which it should be because of the static publisher) the modulo should pass
 bool comparePointClouds(const pcl::PCLPointCloud2& inputCloudA, const pcl::PCLPointCloud2& inputCloudB)
 {
 	int sizeA = inputCloudA.width * inputCloudA.height;
@@ -76,7 +77,7 @@ int countClusters(const vector<pcl::PCLPointCloud2>& input)
 
 
 //test if output of obstacle_detector is (a modulo of) the original pointcloud in size
-TEST(ObstacleDetectorTests, comparePointClouds)
+TEST(ObstacleDetectorTests, comparePointCloudsRaw)
 {
 	EXPECT_EQ(true, comparePointClouds(mReceivedRaw,mOriginal));
 }
@@ -86,6 +87,12 @@ TEST(ObstacleDetectorTests, comparePointClouds)
 TEST(ObstacleDetectorTests, countClusters)
 {
 	EXPECT_EQ(27, countClusters(mClusters));		
+}
+
+
+TEST(ObstacleDetectorTests, DISABLED_voxelTest)
+{
+	//pass		
 }
 
 
