@@ -112,7 +112,7 @@ TEST(Skynav_systemTestSuite, drive_2m_straight)
 	EXPECT_TRUE(validate_location(target.pose));
 	
 }
-TEST(Skynav_systemTestSuite, drive_2m_straight_return)
+TEST(Skynav_systemTestSuite, DISABLED_drive_2m_straight_return)
 {
 	nav_msgs::Path path;
 	geometry_msgs::PoseStamped ps, start, target;
@@ -150,7 +150,7 @@ TEST(Skynav_systemTestSuite, drive_2m_straight_return)
 	EXPECT_TRUE(validate_location(target.pose));
 	
 }
-TEST(Skynav_systemTestSuite, drive_4m_square)
+TEST(Skynav_systemTestSuite, DISABLED_drive_4m_square)
 {
 	nav_msgs::Path path;
 	geometry_msgs::PoseStamped ps, start, target;
