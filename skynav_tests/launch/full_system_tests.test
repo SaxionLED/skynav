@@ -1,8 +1,14 @@
 <launch>
-
-	<include file="$(find x80sv_bringup)/launch/sim/sim_world_nogui.launch"/>
 	
-	<include file="$(find x80sv_bringup)/launch/sim/skynav_sim_robot.launch"/>
+    <arg name="use_gui" default="false" />
+	
+	<include file="$(find x80sv_bringup)/launch/sim/sim_world.launch">
+    <arg name= "use_gui" value="$(arg use_gui)"/>
+    </include>
+	
+	<include file="$(find x80sv_bringup)/launch/sim/skynav_sim_robot.launch">
+    <arg name= "use_gui" value="$(arg use_gui)"/>
+	</include>
 	
 	<include file="$(find skynav_tests)/launch/test_skynav.test"/>
     
