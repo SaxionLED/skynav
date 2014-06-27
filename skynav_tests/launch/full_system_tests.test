@@ -1,8 +1,8 @@
 <launch>
 
-	<include file="$(find x80sv_bringup)/launch/sim_worlds/sim_world.launch"/>
+	<include file="$(find x80sv_bringup)/launch/sim/sim_world_nogui.launch"/>
 	
-	<include file="$(find x80sv_bringup)/launch/skynav_sim_robot.launch"/>
+	<include file="$(find x80sv_bringup)/launch/sim/skynav_sim_robot.launch"/>
 	
 	<include file="$(find skynav_tests)/launch/test_skynav.test"/>
     
