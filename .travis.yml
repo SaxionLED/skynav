@@ -38,6 +38,8 @@ install:
 before_script:
   - source /opt/ros/hydro/setup.bash
   - cd ~/skynav_ws/src
+  # gazebo simulator needs a display, even headless.. set display:=0
+  - export DISPLAY=:0
 script:
   - cd ~/skynav_ws
   - catkin_make
