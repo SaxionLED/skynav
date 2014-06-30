@@ -18,6 +18,7 @@ before_install:
   - sudo apt-get install ros-hydro-nav-msgs ros-hydro-sensor-msgs ros-hydro-laser-geometry ros-hydro-pcl-ros
   - sudo apt-get install ros-hydro-catkin ros-hydro-ros ros-hydro-diagnostics
   - sudo apt-get install ros-hydro-gazebo-ros
+  - sudo apt-get install ros-hydro-controller-manager
   - sudo apt-get install python-catkin-pkg python-empy ros-hydro-xacro 
   - pip install catkin_pkg
   - pip install empy
@@ -38,7 +39,7 @@ install:
 before_script:
   - source /opt/ros/hydro/setup.bash
   - cd ~/skynav_ws/src
-  # gazebo simulator needs a display, even headless.. set display:=0
+  # gazebo simulator needs a display, even headless.. set display:=99.0, and start virtual frame buffer
   - export DISPLAY=:99.0
   - sh -e /etc/init.d/xvfb start
 script:
