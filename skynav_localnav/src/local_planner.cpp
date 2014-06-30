@@ -238,7 +238,7 @@ int main(int argc, char **argv) {
     
 	servClientCurrentPose = n_slam.serviceClient<skynav_msgs::current_pose>("current_pose");
 
-	ros::Rate loop_rate(1);
+	ros::Rate loop_rate(2);
 
 	while(ros::ok){
 		
