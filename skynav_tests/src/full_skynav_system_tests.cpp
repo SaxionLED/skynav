@@ -80,7 +80,7 @@ bool validate_location(geometry_msgs::Pose targetPose)
 	return false;
 }
 
-TEST(Skynav_systemTestSuite, drive_2m_straight)
+TEST(Skynav_systemTestSuite, DISABLED_drive_2m_straight)
 {
 	nav_msgs::Path path;
 	geometry_msgs::PoseStamped ps, start, target;
@@ -102,10 +102,13 @@ TEST(Skynav_systemTestSuite, drive_2m_straight)
 		path.poses.push_back(target);
 	}
 	
-	pubPath.publish(path);	
+	pubPath.publish(path);
+	ros::Rate loop_rate(2);	
 	while(!mNav_stop)
 	{
-		ros::spinOnce();		
+		ros::spinOnce();
+		loop_rate.sleep();		
+		
 	}
 	mNav_stop = false;
 
@@ -115,6 +118,7 @@ TEST(Skynav_systemTestSuite, drive_2m_straight)
 TEST(Skynav_systemTestSuite, DISABLED_drive_2m_straight_return)
 {
 	nav_msgs::Path path;
+	path.header.frame_id = "/map";
 	geometry_msgs::PoseStamped ps, start, target;
 	ps.header.frame_id  = "/map";
 	ps.header.stamp = ros::Time::now();	
@@ -141,18 +145,22 @@ TEST(Skynav_systemTestSuite, DISABLED_drive_2m_straight_return)
 	
 	pubPath.publish(path);	
 	
+	ros::Rate loop_rate(2);	
 	while(!mNav_stop)
 	{
-		ros::spinOnce();		
+		ros::spinOnce();
+		loop_rate.sleep();		
+		
 	}
 	mNav_stop = false;
 
 	EXPECT_TRUE(validate_location(target.pose));
 	
 }
-TEST(Skynav_systemTestSuite, DISABLED_drive_4m_square)
+TEST(Skynav_systemTestSuite, drive_4m_square)
 {
 	nav_msgs::Path path;
+	path.header.frame_id = "/map";
 	geometry_msgs::PoseStamped ps, start, target;
 	ps.header.frame_id  = "/map";
 	ps.header.stamp = ros::Time::now();	
@@ -204,9 +212,12 @@ TEST(Skynav_systemTestSuite, DISABLED_drive_4m_square)
 	
 	pubPath.publish(path);	
 	
+	ros::Rate loop_rate(2);	
 	while(!mNav_stop)
 	{
-		ros::spinOnce();		
+		ros::spinOnce();
+		loop_rate.sleep();		
+		
 	}
 	mNav_stop = false;
 
@@ -216,6 +227,8 @@ TEST(Skynav_systemTestSuite, DISABLED_drive_4m_square)
 TEST(Skynav_systemTestSuite, DISABLED_drive_path)
 {
 	nav_msgs::Path path;
+	path.header.frame_id = "/map";
+
 	geometry_msgs::PoseStamped ps, start, target;
 	ps.header.frame_id  = "/map";
 	ps.header.stamp = ros::Time::now();	
@@ -227,6 +240,51 @@ TEST(Skynav_systemTestSuite, DISABLED_drive_path)
 		start.header = ps.header;
 		path.poses.push_back(start);
 	}
+		{	//waypoint
+		ps.pose.position.x = 2;
+		ps.pose.position.y = 0;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = 4;
+		ps.pose.position.y = 0;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = 5;
+		ps.pose.position.y = -0.75;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = 6.5;
+		ps.pose.position.y = -2;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = 5;
+		ps.pose.position.y = -4;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = 4;
+		ps.pose.position.y = -5;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = 2;
+		ps.pose.position.y = -5;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = 0;
+		ps.pose.position.y = -5;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = 0;
+		ps.pose.position.y = -2;
+		path.poses.push_back(ps);
+	}
 	{	//target
 		target.pose.position.x = 0;
 		target.pose.position.y = 0;
@@ -237,18 +295,99 @@ TEST(Skynav_systemTestSuite, DISABLED_drive_path)
 	
 	pubPath.publish(path);	
 	
+	ros::Rate loop_rate(2);	
 	while(!mNav_stop)
 	{
-		ros::spinOnce();		
+		ros::spinOnce();
+		loop_rate.sleep();		
+		
 	}
 	mNav_stop = false;
 
 	EXPECT_TRUE(validate_location(target.pose));
 	
 }	
-TEST(Skynav_systemTestSuite, DISABLED_Test5)
+TEST(Skynav_systemTestSuite, DISABLED_drive_path_2)
 {
-	//pass
+	nav_msgs::Path path;
+	path.header.frame_id = "/map";
+	geometry_msgs::PoseStamped ps, start, target;
+	ps.header.frame_id  = "/map";
+	ps.header.stamp = ros::Time::now();	
+	
+	{	//start
+		start.pose.position.x = 0;
+		start.pose.position.y = 0;
+		start.pose.orientation.z = 0;	
+		start.header = ps.header;
+		path.poses.push_back(start);
+	}
+		{	//waypoint
+		ps.pose.position.x = -2;
+		ps.pose.position.y = -2;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = -3;
+		ps.pose.position.y = -0.5;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = -5;
+		ps.pose.position.y = 0;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = -7;
+		ps.pose.position.y = 0;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = -7;
+		ps.pose.position.y = 2;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = -4;
+		ps.pose.position.y = 5.75;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = -2;
+		ps.pose.position.y = 6.2;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = -2;
+		ps.pose.position.y = 4;
+		path.poses.push_back(ps);
+	}
+		{	//waypoint
+		ps.pose.position.x = -1;
+		ps.pose.position.y = 3;
+		path.poses.push_back(ps);
+	}
+	{	//target
+		target.pose.position.x = 0;
+		target.pose.position.y = 0;
+		target.pose.orientation.z = 180;	
+		target.header = ps.header;
+		path.poses.push_back(target);
+	}
+	
+	pubPath.publish(path);	
+	
+	ros::Rate loop_rate(2);	
+	while(!mNav_stop)
+	{
+		ros::spinOnce();
+		loop_rate.sleep();		
+		
+	}
+	mNav_stop = false;
+
+	EXPECT_TRUE(validate_location(target.pose));
+	
 	
 }
 TEST(Skynav_systemTestSuite, DISABLED_Test6)
@@ -295,6 +434,8 @@ int main(int argc, char **argv)
 		ros::spinOnce();
 		
 		RUN_ALL_TESTS();
+		
+		ros::Duration(5).sleep();
 		
 		ros::shutdown();
 	}
