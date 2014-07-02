@@ -1,0 +1,11 @@
+<launch>
+	
+    <arg name="use_gui" default="true" />	
+
+	<include file="$(find x80sv_bringup)/launch/real/skynav_real_robot.launch">
+    <arg name= "use_gui" value="$(arg use_gui)"/>
+	</include>
+	
+	<include file="$(find skynav_tests)/launch/real_test_skynav.test"/>
+    
+</launch>

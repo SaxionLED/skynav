@@ -1,15 +1,17 @@
 <launch>
 	
-    <arg name="use_gui" default="false" />
+    <arg name="use_gui" default="true" />
+	<arg name= "worldfile" default="world_test.world"/>
 	
 	<include file="$(find x80sv_bringup)/launch/sim/sim_world.launch">
     <arg name= "use_gui" value="$(arg use_gui)"/>
+    <arg name= "worldfile" value="$(arg worldfile)"/>
     </include>
 	
 	<include file="$(find x80sv_bringup)/launch/sim/skynav_sim_robot.launch">
     <arg name= "use_gui" value="$(arg use_gui)"/>
 	</include>
 	
-	<include file="$(find skynav_tests)/launch/test_skynav.test"/>
+	<include file="$(find skynav_tests)/launch/sim_test_skynav.test"/>
     
 </launch>

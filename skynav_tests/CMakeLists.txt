@@ -22,7 +22,7 @@ add_rostest_gtest(test_local_planner launch/test_local_planner.test src/test_loc
 target_link_libraries(test_local_planner ${catkin_LIBRARIES})
 add_dependencies(test_local_planner skynav_msgs_gencpp)
 
-add_rostest_gtest(full_skynav_system_tests launch/full_system_tests.test src/full_skynav_system_tests.cpp)
+add_rostest_gtest(full_skynav_system_tests launch/sim_full_system_tests.test src/full_skynav_system_tests.cpp)
 
 target_link_libraries(full_skynav_system_tests ${catkin_LIBRARIES})
 add_dependencies(full_skynav_system_tests skynav_msgs_gencpp)
