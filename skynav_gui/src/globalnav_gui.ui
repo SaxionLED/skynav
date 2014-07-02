@@ -689,6 +689,13 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="emergencyStopButton">
+         <property name="text">
+          <string>!EMERGENCY STOP!</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QTabWidget" name="graphics_tab">

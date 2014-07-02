@@ -67,8 +67,8 @@ uint8_t mMovementState = MOV_READY;		// initial movement_state
 
 
 //callback to change navigationstate on an interrupt from outside
-void subNavigationStateInterruptCallback(const std_msgs::UInt8::ConstPtr& msg) {
-	
+void subNavigationStateInterruptCallback(const std_msgs::UInt8::ConstPtr& msg) 
+{	
 	mNavigationState = msg->data;
 	ROS_WARN("nav_state interrupted, changed to (%u)", msg->data);
     pubNavigationState.publish(msg);
@@ -76,9 +76,9 @@ void subNavigationStateInterruptCallback(const std_msgs::UInt8::ConstPtr& msg) {
 }
 
 //function to change navigationstate from within this node, and publish current state to the outside
-void pubNavigationStateHelper(NAVIGATION_STATE state) {
-	
-    // set the local state to ensure there is no delay
+void pubNavigationStateHelper(NAVIGATION_STATE state) 
+{
+	// set the local state to ensure there is no delay
     mNavigationState = state;
 
     std_msgs::UInt8 pubmsg;
@@ -87,8 +87,8 @@ void pubNavigationStateHelper(NAVIGATION_STATE state) {
 }
 
 //remove the current known path
-void clearPath() {
-	
+void clearPath() 
+{	
     mCurrentPath->clear(); 
     mOriginalPath->clear();
     path_init = false;
@@ -96,8 +96,8 @@ void clearPath() {
 
 //update the current path.
 //if CONSECUTIVE_WAYPOINTS is active, the newly received path will be added to the current path
-void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {	
-	
+void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) 
+{		
 	ROS_INFO("path received by motion control");
 
 	if(CONSECUTIVE_PATHS && path_init)
@@ -119,19 +119,19 @@ void subCheckedWaypointsCallback(const nav_msgs::Path::ConstPtr& msg) {
 }
 
 //update the current movement_state
-void setMovementState(MOVEMENT_STATE moveState) {
-	
+void setMovementState(MOVEMENT_STATE moveState) 
+{	
     mMovementState = moveState;
 }
 
 //calculate distance between two point with use of pythagoras
-double calcDistance(Point a, Point b){
-	
+double calcDistance(Point a, Point b)
+{	
 	return sqrt(pow((a.x - b.x),2) + pow((a.y - b.y),2));
 }
 
-void publishCmdVel(Twist twist)	{	
-	
+void publishCmdVel(Twist twist)	
+{		
 	if(twist.linear.x > MOTION_VELOCITY){
 		ROS_ERROR("Attempt to send cmdvel %f, which is higher than max intended velocity. sending max intended velocity of: %f",twist.linear.x,MOTION_VELOCITY);
 		twist.linear.x = MOTION_VELOCITY;
@@ -143,8 +143,8 @@ void publishCmdVel(Twist twist)	{
 	//mCmdVelTimeout = mNode->createTimer(ros::Duration(t), cmdVelTimeoutCallback); 
 }
 
-void cmdVelTimeoutCallback(const ros::TimerEvent&) {
-	
+void cmdVelTimeoutCallback(const ros::TimerEvent&) 
+{	
     mCmdVelTimeout.stop();
     pubNavigationStateHelper(NAV_READY); 
     
@@ -154,8 +154,8 @@ void cmdVelTimeoutCallback(const ros::TimerEvent&) {
     ROS_INFO("stopped timer");
 }
 
-Pose getCurrentPose() {
-	
+Pose getCurrentPose() 
+{	
 	try{
 		Pose currentPose;
 
@@ -176,8 +176,8 @@ Pose getCurrentPose() {
 	}
 }
 
-Twist getCurrentVelocity() {
-	
+Twist getCurrentVelocity() 
+{	
 	try{
 		Twist currentVelocity;
 
@@ -233,8 +233,8 @@ void motionTurn(const double theta) {
 
 }
 
-void navigate() {
-
+void navigate() 
+{
     switch (mNavigationState) {
 
         case NAV_READY: 	
@@ -267,6 +267,7 @@ void navigate() {
 			{				
 				if (posesEqual(currentPose, targetPose.pose)) 
 				{ 
+					ROS_INFO("Location: (%f,%f)", currentPose.position.x, currentPose.position.y);
 					mCurrentPath->pop_front();
 					
 				}else{
@@ -335,7 +336,7 @@ void navigate() {
 					case MOV_TURN:
 					{
 						if(!in_motion){
-							ROS_INFO("mov_turn");
+							//ROS_INFO("mov_turn");
 							Twist twist;
 							if(fmod(currentPose.orientation.z - theta + (M_PI*2), M_PI*2) <= M_PI)	{
 								twist.angular.z = -TURN_VELOCITY;
@@ -383,7 +384,7 @@ void navigate() {
 					break;
 					case MOV_ACCEL:
 					{
-						ROS_INFO("mov_accel");
+						//ROS_INFO("mov_accel");
 
 						//relative target pose is a point along the relative x of the robot.
 						relativeTargetPose.position.x = calcDistance(absoluteTargetPose.pose.position, currentPose.position);
@@ -412,7 +413,7 @@ void navigate() {
 					case MOV_STEADY:
 					{
 						if(!in_motion){
-							ROS_INFO("mov_steady");
+							//ROS_INFO("mov_steady");
 							in_motion = true;
 						}
 													
@@ -434,7 +435,7 @@ void navigate() {
 					break;
 					case MOV_DECEL:
 					{
-						ROS_INFO("mov_decel");
+						//ROS_INFO("mov_decel");
 						Twist twist;
 						for(double s = steadyVelocity; s >= steadyVelocity / 16; s /= 2)	{
 			
@@ -450,7 +451,7 @@ void navigate() {
 					break;
 					case MOV_REACHED:
 					{
-						ROS_INFO("mov_reached");
+						//ROS_INFO("mov_reached");
 						pubNavigationStateHelper(NAV_POSE_REACHED); // turn was within error value, so was distance. so pose should be reached within error values
 					}
 					break;		
@@ -565,16 +566,36 @@ void navigate() {
     }
 }
 
-int main(int argc, char **argv) {
+void emergency_stop()
+{
+	ROS_ERROR("FULL EMERGENCY STOP!");
+	Twist twist_stop;
+	publishCmdVel(twist_stop);
+	clearPath();
+	pubNavigationStateHelper(NAV_READY); 
+}
 
+void subEmergencyStopCallback(const std_msgs::UInt8::ConstPtr& msg)
+{
+	if (msg)
+	{
+		emergency_stop();
+	}else{
+		ROS_WARN("unknown emergency stop signal received");
+	}
+}
+
+int main(int argc, char **argv) 
+{
     ros::init(argc, argv, "motion_control");
-
-	ros::NodeHandle n = ros::NodeHandle("");
+    ROS_INFO("starting motion_control");
+    
+    
+    ros::NodeHandle n = ros::NodeHandle("");
     ros::NodeHandle n_localnav("/localnav");
     
     mNode = new ros::NodeHandle("/control");
     mNodeSLAM = new ros::NodeHandle("/slam");
-
 
     //pubs
     pubCmdVel = n.advertise<Twist>("/cmd_vel", 1);
@@ -584,7 +605,8 @@ int main(int argc, char **argv) {
     //subs
     ros::Subscriber subCheckedWaypoints = mNode->subscribe("checked_waypoints", 1, subCheckedWaypointsCallback);
     ros::Subscriber subNavigationState = mNode->subscribe("navigation_state_interrupt", 0, subNavigationStateInterruptCallback);
-
+	ros::Subscriber subEmergencyStop = mNode->subscribe("emergencystop_interrupt",0,subEmergencyStopCallback);
+	
     //services
     servClientCurrentPose = mNodeSLAM->serviceClient<skynav_msgs::current_pose>("current_pose");
     servClientCurrentVelocity = mNodeSLAM->serviceClient<skynav_msgs::current_velocity>("current_velocity");
@@ -601,7 +623,9 @@ int main(int argc, char **argv) {
 
         loop_rate.sleep();
     }
-
+	
+	emergency_stop(); // does not do anything?. needs to be called before ros shutdown
+	
     delete mNode;
     delete mNodeSLAM;
 

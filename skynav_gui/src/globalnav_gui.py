@@ -17,6 +17,7 @@ from python_qt_binding import loadUi
 import std_msgs.msg
 import nav_msgs.msg
 import geometry_msgs.msg
+from std_msgs.msg import UInt8
 from geometry_msgs.msg import Pose2D
 from geometry_msgs.msg import Pose
 from geometry_msgs.msg import PoseStamped
@@ -108,6 +109,7 @@ class GlobalNavGUI(QWidget):
 		self.query_pub = rospy.Publisher('/globalnav/user_input_query',user_input_query)	
 		self.re_init_pub = rospy.Publisher('/globalnav/user_init',user_init)	
 		self.target_pub = rospy.Publisher('/globalnav/waypoints',Path)
+		self.embreak_pub = rospy.Publisher('/control/emergencystop_interrupt',UInt8)
 		
 		#ROS services
 		self.loadNewMap_srv = rospy.ServiceProxy('/globalnav/update_map_req',mapreader_srv)
@@ -123,6 +125,7 @@ class GlobalNavGUI(QWidget):
 		self._widget.fixedwps_delete.clicked.connect(self.delRow)
 		self._widget.manualTargetButton.clicked.connect(self.sendManualTarget)
 		self._widget.meters_toggle.clicked.connect(self.toggleMeters)
+		self._widget.emergencyStopButton.clicked.connect(self.emergencyBreakSend)
 
 		self._widget.save_button.clicked.connect(self.demoFunction)
 		
@@ -397,7 +400,10 @@ class GlobalNavGUI(QWidget):
 			self._widget.meters_label.setText("Meters")
 		else:
 			self._widget.meters_label.setText("Gridcells")
-	
+			
+	def emergencyBreakSend(self):
+		msg = UInt8(1)
+		self.embreak_pub.publish(msg)
 
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------------
