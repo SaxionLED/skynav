@@ -52,7 +52,6 @@ geometry_msgs::Pose getCurrentPose()
 	}
 }
 
-
 void subNavigationStateCallback(const std_msgs::UInt8& msg )
 {
 	mControl_NavigationState = msg.data;
@@ -62,12 +61,12 @@ void subNavigationStateCallback(const std_msgs::UInt8& msg )
 	}	
 }
 
-double calcDistance(geometry_msgs::Pose a, geometry_msgs::Pose b)
+double calcDistance(const geometry_msgs::Pose a, const geometry_msgs::Pose b)
 {
 	return sqrt(pow((a.position.x - b.position.x),2) + pow((a.position.y - b.position.y),2));
 }
 
-bool validate_location(geometry_msgs::Pose targetPose)
+bool validate_location(const geometry_msgs::Pose targetPose)
 {
 	geometry_msgs::Pose currentPose = getCurrentPose();
 	
@@ -80,70 +79,41 @@ bool validate_location(geometry_msgs::Pose targetPose)
 	return false;
 }
 
-TEST(Skynav_systemTestSuite, DISABLED_drive_2m_straight)
+void publish_path(vector<geometry_msgs::Pose>& pathVector)
 {
 	nav_msgs::Path path;
-	geometry_msgs::PoseStamped ps, start, target;
+	geometry_msgs::PoseStamped ps;
 	ps.header.frame_id  = "/map";
 	ps.header.stamp = ros::Time::now();	
 	
-	{	//start
-		start.pose.position.x = 0;
-		start.pose.position.y = 0;
-		start.pose.orientation.z = 0;	
-		start.header = ps.header;
-		path.poses.push_back(start);
-	}
-	{	//target
-		target.pose.position.x = 2;
-		target.pose.position.y = 0;
-		target.pose.orientation.z = 180;	
-		target.header = ps.header;
-		path.poses.push_back(target);
-	}
-	
-	pubPath.publish(path);
-	ros::Rate loop_rate(2);	
-	while(!mNav_stop)
+	for(vector<geometry_msgs::Pose>::iterator it = pathVector.begin(); it != pathVector.end(); ++it)
 	{
-		ros::spinOnce();
-		loop_rate.sleep();		
-		
+		ps.pose = (*it);		
+		path.poses.push_back(ps);	
 	}
-	mNav_stop = false;
-
-	EXPECT_TRUE(validate_location(target.pose));
-	
-}
-TEST(Skynav_systemTestSuite, DISABLED_drive_2m_straight_return)
-{
-	nav_msgs::Path path;
 	path.header.frame_id = "/map";
-	geometry_msgs::PoseStamped ps, start, target;
-	ps.header.frame_id  = "/map";
-	ps.header.stamp = ros::Time::now();	
-	
-	{	//start
-		start.pose.position.x = 0;
-		start.pose.position.y = 0;
-		start.pose.orientation.z = 0;	
-		start.header = ps.header;
-		path.poses.push_back(start);
-	}
-	{	//waypoint
-		ps.pose.position.x = 2;
-		ps.pose.position.y = 0;
-		path.poses.push_back(ps);
-	}
-	{	//target
-		target.pose.position.x = 0;
-		target.pose.position.y = 0;
-		target.pose.orientation.z = 180;	
-		target.header = ps.header;
-		path.poses.push_back(target);
+	path.header.stamp = ros::Time::now();	
+
+	pubPath.publish(path);
+}
+
+
+TEST(Skynav_systemTestSuite, drive_2m_straight)
+{
+	vector<geometry_msgs::Pose> pathVector;
+	geometry_msgs::Pose wp;	
+	{
+	wp.position.x = 0;
+	wp.position.y = 0;
+	pathVector.push_back(wp);
+
+	wp.position.x = 2;
+	wp.position.y = 0;
+	wp.orientation.z = 180;
+	pathVector.push_back(wp);	
 	}
 	
-	pubPath.publish(path);	
+	publish_path(pathVector);
 	
 	ros::Rate loop_rate(2);	
 	while(!mNav_stop)
@@ -154,63 +124,83 @@ TEST(Skynav_systemTestSuite, DISABLED_drive_2m_straight_return)
 	}
 	mNav_stop = false;
 
-	EXPECT_TRUE(validate_location(target.pose));
+	EXPECT_TRUE(validate_location(pathVector.back()));	
+}
+
+TEST(Skynav_systemTestSuite, drive_2m_straight_return)
+{
+	vector<geometry_msgs::Pose> pathVector;
+	geometry_msgs::Pose wp;		
+	{
+	wp.position.x = 0;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 2;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 0;
+	wp.position.y = 0;
+	wp.orientation.z = 180;	
+	pathVector.push_back(wp);
+	}
+	
+	publish_path(pathVector);
+	
+	ros::Rate loop_rate(2);	
+	while(!mNav_stop)
+	{
+		ros::spinOnce();
+		loop_rate.sleep();		
+		
+	}
+	mNav_stop = false;
+
+	EXPECT_TRUE(validate_location(pathVector.back()));
 	
 }
+
 TEST(Skynav_systemTestSuite, drive_4m_square)
 {
-	nav_msgs::Path path;
-	path.header.frame_id = "/map";
-	geometry_msgs::PoseStamped ps, start, target;
-	ps.header.frame_id  = "/map";
-	ps.header.stamp = ros::Time::now();	
-	
-	{	//start
-		start.pose.position.x = 0;
-		start.pose.position.y = 0;
-		start.pose.orientation.z = 0;	
-		start.header = ps.header;
-		path.poses.push_back(start);
-	}
-	{	//waypoint
-		ps.pose.position.x = 2;
-		ps.pose.position.y = 0;
-		path.poses.push_back(ps);
-	}
-	{	//waypoint
-		ps.pose.position.x = 2;
-		ps.pose.position.y = 2;
-		path.poses.push_back(ps);
-	}
-	{	//waypoint
-		ps.pose.position.x = -2;
-		ps.pose.position.y = 2;
-		path.poses.push_back(ps);
-	}
-	{	//waypoint
-		ps.pose.position.x = -2;
-		ps.pose.position.y = -2;
-		path.poses.push_back(ps);
-	}
-	{	//waypoint
-		ps.pose.position.x = 2;
-		ps.pose.position.y = -2;
-		path.poses.push_back(ps);
-	}
-	{	//waypoint
-		ps.pose.position.x = 2;
-		ps.pose.position.y = 0;
-		path.poses.push_back(ps);
-	}
-	{	//target
-		target.pose.position.x = 0;
-		target.pose.position.y = 0;
-		target.pose.orientation.z = 180;	
-		target.header = ps.header;
-		path.poses.push_back(target);
+	vector<geometry_msgs::Pose> pathVector;
+	geometry_msgs::Pose wp;	
+	{	
+	wp.position.x = 0;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 2;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 2;
+	wp.position.y = 2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -2;
+	wp.position.y = 2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -2;
+	wp.position.y = -2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 2;
+	wp.position.y = -2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 2;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 0;
+	wp.position.y = 0;
+	wp.orientation.z = 180;	
+	pathVector.push_back(wp);		
 	}
 	
-	pubPath.publish(path);	
+	publish_path(pathVector);
 	
 	ros::Rate loop_rate(2);	
 	while(!mNav_stop)
@@ -221,79 +211,59 @@ TEST(Skynav_systemTestSuite, drive_4m_square)
 	}
 	mNav_stop = false;
 
-	EXPECT_TRUE(validate_location(target.pose));
-	
+	EXPECT_TRUE(validate_location(pathVector.back()));
 }
-TEST(Skynav_systemTestSuite, DISABLED_drive_path)
-{
-	nav_msgs::Path path;
-	path.header.frame_id = "/map";
 
-	geometry_msgs::PoseStamped ps, start, target;
-	ps.header.frame_id  = "/map";
-	ps.header.stamp = ros::Time::now();	
-	
-	{	//start
-		start.pose.position.x = 0;
-		start.pose.position.y = 0;
-		start.pose.orientation.z = 0;	
-		start.header = ps.header;
-		path.poses.push_back(start);
-	}
-		{	//waypoint
-		ps.pose.position.x = 2;
-		ps.pose.position.y = 0;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = 4;
-		ps.pose.position.y = 0;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = 5;
-		ps.pose.position.y = -0.75;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = 6.5;
-		ps.pose.position.y = -2;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = 5;
-		ps.pose.position.y = -4;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = 4;
-		ps.pose.position.y = -5;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = 2;
-		ps.pose.position.y = -5;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = 0;
-		ps.pose.position.y = -5;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = 0;
-		ps.pose.position.y = -2;
-		path.poses.push_back(ps);
-	}
-	{	//target
-		target.pose.position.x = 0;
-		target.pose.position.y = 0;
-		target.pose.orientation.z = 180;	
-		target.header = ps.header;
-		path.poses.push_back(target);
-	}
-	
-	pubPath.publish(path);	
+TEST(Skynav_systemTestSuite, drive_path)
+{
+	vector<geometry_msgs::Pose> pathVector;
+	geometry_msgs::Pose wp;	
+	{
+	wp.position.x = 0;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 2;
+	wp.position.y = 0;
+
+	wp.position.x = 4;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 5;
+	wp.position.y = -0.75;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 6.5;
+	wp.position.y = -2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 5;
+	wp.position.y = -4;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 4;
+	wp.position.y = -5;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 2;
+	wp.position.y = -5;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 0;
+	wp.position.y = -5;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 0;
+	wp.position.y = -2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 0;
+	wp.position.y = 0;
+	wp.orientation.z = 180;	
+	pathVector.push_back(wp);	
+	}	
+	publish_path(pathVector);
 	
 	ros::Rate loop_rate(2);	
 	while(!mNav_stop)
@@ -304,78 +274,63 @@ TEST(Skynav_systemTestSuite, DISABLED_drive_path)
 	}
 	mNav_stop = false;
 
-	EXPECT_TRUE(validate_location(target.pose));
+	EXPECT_TRUE(validate_location(pathVector.back()));	
 	
 }	
-TEST(Skynav_systemTestSuite, DISABLED_drive_path_2)
+
+TEST(Skynav_systemTestSuite, drive_path_2)
 {
-	nav_msgs::Path path;
-	path.header.frame_id = "/map";
-	geometry_msgs::PoseStamped ps, start, target;
-	ps.header.frame_id  = "/map";
-	ps.header.stamp = ros::Time::now();	
+	vector<geometry_msgs::Pose> pathVector;
+	geometry_msgs::Pose wp;	
 	
-	{	//start
-		start.pose.position.x = 0;
-		start.pose.position.y = 0;
-		start.pose.orientation.z = 0;	
-		start.header = ps.header;
-		path.poses.push_back(start);
-	}
-		{	//waypoint
-		ps.pose.position.x = -2;
-		ps.pose.position.y = -2;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = -3;
-		ps.pose.position.y = -0.5;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = -5;
-		ps.pose.position.y = 0;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = -7;
-		ps.pose.position.y = 0;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = -7;
-		ps.pose.position.y = 2;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = -4;
-		ps.pose.position.y = 5.75;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = -2;
-		ps.pose.position.y = 6.2;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = -2;
-		ps.pose.position.y = 4;
-		path.poses.push_back(ps);
-	}
-		{	//waypoint
-		ps.pose.position.x = -1;
-		ps.pose.position.y = 3;
-		path.poses.push_back(ps);
-	}
-	{	//target
-		target.pose.position.x = 0;
-		target.pose.position.y = 0;
-		target.pose.orientation.z = 180;	
-		target.header = ps.header;
-		path.poses.push_back(target);
+	{	
+	wp.position.x = 0;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -2;
+	wp.position.y = -2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -3;
+	wp.position.y = -0.5;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -5;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -7;
+	wp.position.y = 0;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -7;
+	wp.position.y = 2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -4;
+	wp.position.y = 5.75;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -2;
+	wp.position.y = 6.2;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -2;
+	wp.position.y = 4;
+	pathVector.push_back(wp);	
+
+	wp.position.x = -1;
+	wp.position.y = 3;
+	pathVector.push_back(wp);	
+
+	wp.position.x = 0;
+	wp.position.y = 0;
+	wp.orientation.z = 180;	
+	pathVector.push_back(wp);	
 	}
 	
-	pubPath.publish(path);	
+	publish_path(pathVector);
 	
 	ros::Rate loop_rate(2);	
 	while(!mNav_stop)
@@ -386,20 +341,23 @@ TEST(Skynav_systemTestSuite, DISABLED_drive_path_2)
 	}
 	mNav_stop = false;
 
-	EXPECT_TRUE(validate_location(target.pose));
+	EXPECT_TRUE(validate_location(pathVector.back()));
 	
 	
 }
+
 TEST(Skynav_systemTestSuite, DISABLED_Test6)
 {
 	//pass
 	
 }
+
 TEST(Skynav_systemTestSuite, DISABLED_Test7)
 {
 	//pass
 	
 }
+
 TEST(Skynav_systemTestSuite, DISABLED_Test8)
 {
 	//pass
