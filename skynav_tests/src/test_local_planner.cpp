@@ -65,17 +65,12 @@ TEST(LocalnavTests, DISABLED_recursiveBugCheck)
 }
 
 
-TEST(LocalnavTests, DISABLED_path_waypointCheck)
+TEST(LocalnavTests, DISABLED_path_waypointCheckRecursivebug)
 {
 	//pass
 	
 }
 
-TEST(LocalnavTests, DISABLED_path_waypointCheckRecursiveBug)
-{
-	//pass
-	
-}
 
 int main(int argc, char **argv)
 {
