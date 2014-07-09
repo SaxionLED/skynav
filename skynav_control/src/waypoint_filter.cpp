@@ -11,13 +11,14 @@ using namespace std;
 using namespace geometry_msgs;
 
 ros::Publisher pubWaypoints;
-ros::Publisher pubDummyPath;
 ros::ServiceClient servClientWaypointCheck;
 
+uint8_t mControlNavigationState = 0;
 
 void subNavigationStateCallback(const std_msgs::UInt8::ConstPtr& msg) {
 
     //    ROS_INFO("recv: %d", msg->data);
+    mControlNavigationState = msg->data;
 }
 
 //recieve a path, either from globalnav, or a manual input
@@ -77,13 +78,11 @@ int main(int argc, char **argv) {
     ros::NodeHandle n_globalnav("/globalnav");
 
     //pubs
-    ros::Publisher pubNavigationState = n.advertise<std_msgs::UInt8>("navigation_state", 0);
-    pubWaypoints = n.advertise<nav_msgs::Path>("checked_waypoints", 32);
-	pubDummyPath = n_globalnav.advertise<nav_msgs::Path>("waypoints", 32);
+    pubWaypoints = n.advertise<nav_msgs::Path>("checked_waypoints", 10);
 
     //subs
-    //ros::Subscriber subNavigationState = n.subscribe("navigation_state", 0, subNavigationStateCallback);
-    ros::Subscriber subGlobalPlannerWaypoints = n_globalnav.subscribe("waypoints", 32, subGlobalPlannerWaypointsCallback);
+    ros::Subscriber subNavigationState = n.subscribe("navigation_state", 0, subNavigationStateCallback);
+    ros::Subscriber subGlobalPlannerWaypoints = n_globalnav.subscribe("waypoints", 0, subGlobalPlannerWaypointsCallback);
 
     //service
     servClientWaypointCheck = n_localnav.serviceClient<skynav_msgs::waypoint_check>("path_check");
