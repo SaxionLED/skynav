@@ -16,6 +16,10 @@
 #include <ros/package.h>
 #include "localnav_types.h"
 
+pcl::PCLPointCloud2 read(const std::string& input);
+bool pointCloudsEqual(const pcl::PCLPointCloud2 pc_A ,const pcl::PCLPointCloud2 pc_B);
+bool checkVoxel(const pcl::PCLPointCloud2 pc_A ,const pcl::PCLPointCloud2 pc_B, const float threshold);
+
 
 
 #endif
