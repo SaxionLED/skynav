@@ -98,7 +98,7 @@ void publish_path(vector<geometry_msgs::Pose>& pathVector)
 }
 
 
-TEST(Skynav_systemTestSuite, drive_2m_straight)
+TEST(Skynav_systemTestSuite, DISABLED_drive_2m_straight)
 {
 	vector<geometry_msgs::Pose> pathVector;
 	geometry_msgs::Pose wp;	
@@ -238,8 +238,8 @@ TEST(Skynav_systemTestSuite, drive_path)
 	wp.position.y = -2;
 	pathVector.push_back(wp);	
 
-	wp.position.x = 5;
-	wp.position.y = -4;
+	wp.position.x = 6;
+	wp.position.y = -3;
 	pathVector.push_back(wp);	
 
 	wp.position.x = 4;

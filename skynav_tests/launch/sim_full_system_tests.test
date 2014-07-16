@@ -1,7 +1,7 @@
 <launch>
 	
-    <arg name="use_gui" default="false" />
-	<arg name= "worldfile" default="world_test.world"/>
+    <arg name="use_gui" default="true" />
+	<arg name= "worldfile" default="world_test_2.world"/>
 	
 	<include file="$(find x80sv_bringup)/launch/sim/sim_world.launch">
     <arg name= "use_gui" value="$(arg use_gui)"/>
