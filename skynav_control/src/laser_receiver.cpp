@@ -11,7 +11,7 @@
 using namespace std;
 using namespace sensor_msgs;
 
-ros::Publisher pubCloud, pubCloud_old ;
+ros::Publisher pubCloud ;
 ros::Subscriber laserReceiver;
 
 tf::TransformListener* mTransformListener;
