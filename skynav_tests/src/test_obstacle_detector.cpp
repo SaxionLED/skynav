@@ -92,7 +92,11 @@ TEST(ObstacleDetectorTests, countClusters)
 
 TEST(ObstacleDetectorTests, DISABLED_voxelTest)
 {
-	//pass		
+	//pass	
+	//publish static pointcloud input
+	//publish static pointcloud reference
+	//voxelfilter()
+	//expect_true(validate_voxel(input, reference))	
 }
 
 

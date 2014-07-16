@@ -20,7 +20,6 @@ pcl::PCLPointCloud2 read(const std::string& input)
 	return outputCloud;	
 }
 
-
 bool pointCloudsEqual(const pcl::PCLPointCloud2 pc_A ,const pcl::PCLPointCloud2 pc_B)
 {
 	//TODO further check for similarities

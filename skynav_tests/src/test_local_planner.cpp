@@ -56,19 +56,29 @@ TEST(LocalnavTests, countClusters)
 TEST(LocalnavTests, DISABLED_waypointCheck)
 {
 	//pass
+	//publish static environment
+	//send single start and target waypoint
+	//detect obstacle on that path segment
+	//EXPECT_TRUE(validate_pathcheck(returnvalue));
 }
 
 
 TEST(LocalnavTests, DISABLED_recursiveBugCheck)
 {
 	//pass
+	//publish static obstacle
+	//send single start and target waypoint
+	//detect obstacle on that path segment and calculate reroute
+	//EXPECT_TRUE(validate_pathcheck(returnvalue));
 }
 
 
 TEST(LocalnavTests, DISABLED_path_waypointCheckRecursivebug)
 {
 	//pass
-	
+	//send path containing multiple waypoints
+	//detect obstacles on that path segment and calculate reroutes
+	//EXPECT_TRUE(validate_pathcheck(returnvalue));	
 }
 
 
